@@ -1,0 +1,17 @@
+services:
+  workspace:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu
+    command: sleep infinity
+    env_file:
+      - ../.env
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/postgres
+      - TZ=Asia/Seoul
+    volumes:
+      - ..:/workspaces/life-rpg-web:cached
+    ports:
+      - "3000:3000"   # Next.js
+      - "3001:3001"   # NestJS API
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

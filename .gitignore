@@ -1,8 +1,19 @@
-# Nestjs specific
-/dist
-/node_modules
-/build
-/tmp
+# Dependencies
+node_modules/
+apps/*/node_modules/
+
+# NestJS (apps/api)
+dist/
+build/
+tmp/
+apps/*/dist/
+
+# Next.js (apps/web)
+.next/
+out/
+apps/*/.next/
+*.tsbuildinfo
+.env*.local
 
 # Logs
 logs
@@ -13,11 +24,13 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# dotenv environment variable files
+# dotenv environment variable files (루트 .env는 개발용 기본값으로 커밋)
 .env
 .env.development
 .env.test
 .env.production
+.env.local
+apps/*/.env*
 
 # temp directory
 .temp
