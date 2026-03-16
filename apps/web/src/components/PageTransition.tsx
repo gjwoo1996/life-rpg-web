@@ -14,7 +14,8 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       isFirstLoad = false;
       return;
     }
-    setOpacity(1);
+    const id = requestAnimationFrame(() => setOpacity(1));
+    return () => cancelAnimationFrame(id);
   }, [pathname]);
 
   return (

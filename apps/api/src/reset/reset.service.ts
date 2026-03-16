@@ -30,13 +30,38 @@ export class ResetService {
 
   /** 앱 데이터 전체 리셋 (life-rpg reset_app 대응) - FK 순서 준수 */
   async resetApp() {
-    await this.goalAnalysisRepo.delete({});
-    await this.dailyRepo.delete({});
-    await this.abilityStatRepo.delete({});
-    await this.abilityRepo.delete({});
-    await this.activityRepo.delete({});
-    await this.goalRepo.delete({});
-    await this.characterRepo.delete({});
+    // clear()는 TRUNCATE를 써서 FK 제약에 걸리므로, QueryBuilder DELETE로 자식→부모 순 삭제
+    await this.goalAnalysisRepo
+      .createQueryBuilder()
+      .delete()
+      .from(GoalAnalysis)
+      .execute();
+    await this.dailyRepo
+      .createQueryBuilder()
+      .delete()
+      .from(DailyAnalysis)
+      .execute();
+    await this.abilityStatRepo
+      .createQueryBuilder()
+      .delete()
+      .from(AbilityStat)
+      .execute();
+    await this.abilityRepo
+      .createQueryBuilder()
+      .delete()
+      .from(Ability)
+      .execute();
+    await this.activityRepo
+      .createQueryBuilder()
+      .delete()
+      .from(ActivityLog)
+      .execute();
+    await this.goalRepo.createQueryBuilder().delete().from(Goal).execute();
+    await this.characterRepo
+      .createQueryBuilder()
+      .delete()
+      .from(Character)
+      .execute();
     return { ok: true, message: 'All data reset.' };
   }
 }

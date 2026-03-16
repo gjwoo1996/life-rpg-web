@@ -45,6 +45,8 @@ export type GoalDto = {
   endDate?: string | null;
   targetSkill?: string | null;
   calendarColor?: string;
+  goalAnalysisPromptTemplate?: string | null;
+  goalAnalysisUserInstruction?: string | null;
   createdAt: string;
 };
 
@@ -102,6 +104,8 @@ export const api = {
       endDate?: string;
       targetSkill?: string;
       calendarColor?: string;
+      goalAnalysisPromptTemplate?: string | null;
+      goalAnalysisUserInstruction?: string | null;
     }) =>
       request(`/goal/${id}`, {
         method: "PATCH",

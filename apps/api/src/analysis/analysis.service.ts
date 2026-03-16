@@ -75,24 +75,26 @@ export class AnalysisService {
         }),
       );
     }
-    const prompt = this.ollama.buildDailyAnalysisPrompt(activitiesText);
-    const analysisText = await this.ollama.generateRaw(prompt);
-    const existing = await this.dailyRepo.findOne({
+    const prompt: string = this.ollama.buildDailyAnalysisPrompt(activitiesText);
+    const analysisText = await this.ollama.generateInKoreanOnly(prompt);
+    const existing: DailyAnalysis | null = await this.dailyRepo.findOne({
       where: { characterId, date: d },
     });
     if (existing) {
       await this.dailyRepo.update(existing.id, {
         content: analysisText || 'No analysis generated.',
       });
-      return this.dailyRepo.findOne({ where: { id: existing.id } });
+      const updated: DailyAnalysis | null = await this.dailyRepo.findOne({
+        where: { id: existing.id },
+      });
+      return updated;
     }
-    return this.dailyRepo.save(
-      this.dailyRepo.create({
-        characterId,
-        date: d,
-        content: analysisText || 'No analysis generated.',
-      }),
-    );
+    const created: DailyAnalysis = this.dailyRepo.create({
+      characterId,
+      date: d,
+      content: analysisText || 'No analysis generated.',
+    });
+    return this.dailyRepo.save(created);
   }
 
   /** Generate goal analysis from activities in goal date range (life-rpg get_goal_analysis_text). */
@@ -134,21 +136,30 @@ export class AnalysisService {
     const previousContext =
       prevAnalysis?.content ?? prevAnalysis?.summarizedContext ?? '';
     const targetSkill = goal.targetSkill ?? '';
-    const prompt = this.ollama.buildGoalAnalysisPrompt(
-      goal.title,
-      targetSkill,
-      previousContext,
-      activitiesText,
-    );
-    const analysisText = await this.ollama.generateRaw(prompt);
+    const prompt: string = goal.goalAnalysisPromptTemplate?.trim()
+      ? this.ollama.buildGoalAnalysisPromptFromTemplate(
+          goal.goalAnalysisPromptTemplate,
+          goal.title,
+          targetSkill,
+          previousContext,
+          activitiesText,
+        )
+      : this.ollama.buildGoalAnalysisPromptFixed(
+          goal.title,
+          targetSkill,
+          previousContext,
+          activitiesText,
+          goal.goalAnalysisUserInstruction ?? null,
+        );
+
+    const analysisText = await this.ollama.generateInKoreanOnly(prompt);
     const now = new Date();
-    return this.goalAnalysisRepo.save(
-      this.goalAnalysisRepo.create({
-        goalId,
-        summarizedContext: null,
-        lastAnalyzedAt: now,
-        content: analysisText || 'No analysis generated.',
-      }),
-    );
+    const toSave: GoalAnalysis = this.goalAnalysisRepo.create({
+      goalId,
+      summarizedContext: null,
+      lastAnalyzedAt: now,
+      content: analysisText || 'No analysis generated.',
+    });
+    return this.goalAnalysisRepo.save(toSave);
   }
 }

@@ -23,4 +23,12 @@ export class CreateGoalDto {
   @IsOptional()
   @IsString()
   calendarColor?: string;
+
+  @IsOptional()
+  @IsString()
+  goalAnalysisPromptTemplate?: string | null;
+
+  @IsOptional()
+  @IsString()
+  goalAnalysisUserInstruction?: string | null;
 }

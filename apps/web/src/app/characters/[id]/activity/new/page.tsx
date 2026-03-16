@@ -43,23 +43,26 @@ export default function NewActivityPage() {
     <>
       <AppHeader character={character} />
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href={`/characters/${id}`}
-            className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
+            className="inline-flex items-center gap-1 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
           >
-            ← 캐릭터로
+            <span aria-hidden>←</span> 캐릭터로
           </Link>
+          <span className="text-zinc-300 dark:text-zinc-600">|</span>
           <Link
             href={`/activity?characterId=${id}`}
-            className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
+            className="inline-flex items-center gap-1 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
           >
-            활동 캘린더 보기 →
+            활동 캘린더 보기 <span aria-hidden>→</span>
           </Link>
         </div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          활동 기록 추가
-        </h2>
+        <div className="pb-2 border-b-2 border-emerald-500/50 dark:border-emerald-400/50">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            활동 기록 추가
+          </h2>
+        </div>
         <ActivityLogForm
           characterId={id}
           onCreated={() => router.push(`/characters/${id}`)}

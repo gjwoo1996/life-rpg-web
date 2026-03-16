@@ -41,6 +41,12 @@ export class Goal {
   @Column({ default: '#6366f1' })
   calendarColor: string;
 
+  @Column({ type: 'text', nullable: true })
+  goalAnalysisPromptTemplate: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  goalAnalysisUserInstruction: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -43,17 +43,17 @@ export default function NewGoalPage() {
     <>
       <AppHeader character={character} />
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
-        <div className="flex items-center gap-4">
-          <Link
-            href={`/characters/${id}`}
-            className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
-          >
-            ← 캐릭터로
-          </Link>
+        <Link
+          href={`/characters/${id}`}
+          className="inline-flex items-center gap-1 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
+        >
+          <span aria-hidden>←</span> 캐릭터로
+        </Link>
+        <div className="pb-2 border-b-2 border-amber-500/50 dark:border-amber-400/50">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            목표 추가
+          </h2>
         </div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          목표 추가
-        </h2>
         <GoalForm
           characterId={id}
           onCreated={() => router.push(`/characters/${id}`)}

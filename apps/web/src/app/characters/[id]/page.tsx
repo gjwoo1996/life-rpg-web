@@ -85,7 +85,7 @@ export default function CharacterDetailPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
         <CharacterView character={character} goals={goals} />
 
-      <section className="space-y-6">
+      <section className="space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             목표 · 활동 기록
@@ -100,28 +100,32 @@ export default function CharacterDetailPage() {
             </svg>
           </Link>
         </div>
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h3 className="text-base font-medium text-zinc-800 dark:text-zinc-200">
+
+        {/* 목표 섹션 */}
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 p-4">
+          <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b-2 border-amber-500/50 dark:border-amber-400/50">
+            <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
               목표
             </h3>
             <Link
               href={`/characters/${id}/goals/new`}
-              className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
+              className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition-colors"
             >
               목표 추가
             </Link>
           </div>
           <GoalList goals={goals} />
         </div>
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h3 className="text-base font-medium text-zinc-800 dark:text-zinc-200">
+
+        {/* 활동 기록 섹션 */}
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 p-4">
+          <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b-2 border-emerald-500/50 dark:border-emerald-400/50">
+            <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
               활동 기록 (오늘)
             </h3>
             <Link
               href={`/characters/${id}/activity/new`}
-              className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
+              className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition-colors"
             >
               활동기록 추가
             </Link>

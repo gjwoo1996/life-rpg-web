@@ -11,6 +11,9 @@ const DEFAULT_MODEL = process.env.LIFERPG_LLM_MODEL_DEFAULT || 'qwen2.5:7b';
 const LLM_VERBOSE = process.env.LIFERPG_LLM_VERBOSE === 'true';
 const RESPONSE_PREVIEW_LEN = 200;
 
+const KOREAN_ONLY_SYSTEM =
+  'You must respond only in Korean. Do not use English, Japanese, or Chinese. All output must be in Korean. Never mix other languages.';
+
 @Injectable()
 export class OllamaService {
   private readonly logger = new Logger(OllamaService.name);
@@ -104,26 +107,30 @@ export class OllamaService {
     return this.chat(model, messages);
   }
 
+  /** 한국어 전용 출력으로 생성 (system 메시지로 언어 강제) */
+  async generateInKoreanOnly(prompt: string, model?: string): Promise<string> {
+    const m = model || DEFAULT_MODEL;
+    return this.generate(m, prompt, KOREAN_ONLY_SYSTEM);
+  }
+
   /** 활동 로그를 분석해 요약/인사이트 생성 (life-rpg ai/client.rs analyze_activity 이식) */
   async analyzeActivity(
     activityContent: string,
     model = 'llama3.2',
   ): Promise<string> {
-    const system =
-      'You are an assistant that analyzes daily activity logs and provides brief insights or summaries. You must respond only in Korean. Never use Japanese or Chinese characters. If you write more than one sentence, put each sentence on a new line for readability.';
     return this.generate(
       model,
       `Analyze the following activity log and provide a short summary or insight. Use line breaks between sentences if there are multiple.\n\n${activityContent}`,
-      system,
+      KOREAN_ONLY_SYSTEM,
     );
   }
 
   /** 콘텐츠 요약 (life-rpg ai/prompt.rs build_summary_prompt 이식) - 한국어 한 문장 80자 이내 */
   async summarizeContent(content: string, model?: string): Promise<string> {
-    const prompt = `Summarize the following activity in Korean in one short sentence (under 80 characters). Reply with only the summary, no quotes or prefix. Reply only in Korean. Do not use Japanese or Chinese.
+    const prompt = `Summarize the following activity in Korean in one short sentence (under 80 characters). Reply with only the summary, no quotes or prefix.
 Activity: ${content}
 Summary:`;
-    return this.generateRaw(prompt, model);
+    return this.generateInKoreanOnly(prompt, model);
   }
 
   /** 능력별 XP 분석 (life-rpg ai/client.rs analyze_activity) - JSON { "능력명": XP숫자 } 반환 */
@@ -145,7 +152,7 @@ Summary:`;
 Activity: ${content}
 Return ONLY a JSON object with integer values (0-10) for these keys: ${keys}.
 Example: {${example}}
-Return only the JSON, no other text.`;
+Return only the JSON, no other text or language.`;
     const text = await this.generateRaw(prompt, model);
     const jsonStr = text
       .trim()
@@ -267,5 +274,46 @@ ${activities}
 Write 2-4 sentences: progress so far, what to improve, and encouragement. 반드시 한국어로만 작성하세요. 일본어·중국어를 사용하지 마세요. Reply in Korean only. No prefix or label.
 
 Formatting: Write each sentence on a new line. Use line breaks between sentences for readability. Do not output one long continuous line.`;
+  }
+
+  /** 사용자 정의 목표 분석 프롬프트 템플릿에 플레이스홀더 치환 */
+  buildGoalAnalysisPromptFromTemplate(
+    template: string,
+    goalName: string,
+    targetAbility: string,
+    previousContext: string,
+    activitiesText: string,
+  ): string {
+    return template
+      .replace(/\{\{goalName\}\}/g, goalName)
+      .replace(/\{\{targetAbility\}\}/g, targetAbility)
+      .replace(/\{\{previousContext\}\}/g, previousContext)
+      .replace(
+        /\{\{activitiesText\}\}/g,
+        activitiesText || '(No activities yet)',
+      );
+  }
+
+  /** 고정 구조 목표 분석 프롬프트 (백엔드 고정 + 사용자 추가 지시) */
+  buildGoalAnalysisPromptFixed(
+    goalName: string,
+    targetAbility: string,
+    previousContext: string,
+    activitiesText: string,
+    userInstruction: string | null,
+  ): string {
+    const prevBlock = previousContext
+      ? `이전 분석 요약:\n${previousContext}\n\n`
+      : '';
+    const activities = activitiesText || '(아직 활동 없음)';
+    const userBlock = userInstruction?.trim()
+      ? `\n추가로 다음을 반영해 주세요: ${userInstruction.trim()}\n\n`
+      : '';
+    return `목표: ${goalName}
+스킬/능력: ${targetAbility}
+
+${prevBlock}기간 내 활동:
+${activities}
+${userBlock}위 내용을 바탕으로 진행 상황, 개선점, 격려를 2~4문장 한국어로 작성해 주세요. 문장마다 줄바꿈 해 주세요.`;
   }
 }
