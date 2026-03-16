@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type CharacterDto, type GoalDto } from "@/lib/api";
@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/AppHeader";
 
 function AnalysisContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const characterId = searchParams.get("characterId");
   const [character, setCharacter] = useState<CharacterDto | null>(null);
   const [goals, setGoals] = useState<GoalDto[]>([]);
@@ -17,10 +18,24 @@ function AnalysisContent() {
   >({});
 
   useEffect(() => {
-    if (!characterId) return;
+    if (!characterId) {
+      api.character
+        .list()
+        .then((list) => {
+          if (list.length === 1) {
+            const only = list[0];
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("characterId", only.id);
+            router.replace(`/analysis?${params.toString()}`);
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+
     api.character.get(characterId).then(setCharacter).catch(() => setCharacter(null));
     api.goal.list(characterId).then(setGoals).catch(() => setGoals([]));
-  }, [characterId]);
+  }, [characterId, router, searchParams]);
 
   useEffect(() => {
     if (!characterId || goals.length === 0) return;

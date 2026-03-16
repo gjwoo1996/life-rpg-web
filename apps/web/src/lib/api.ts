@@ -50,6 +50,18 @@ export type GoalDto = {
   createdAt: string;
 };
 
+export type GoalStepDto = {
+  id: string;
+  goalId: string;
+  title: string;
+  description?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ActivityLogDto = {
   id: string;
   characterId: string;
@@ -112,6 +124,39 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: string) => request(`/goal/${id}`, { method: "DELETE" }),
+  },
+
+  goalStep: {
+    list: (goalId: string) =>
+      request<GoalStepDto[]>(`/goal-step?goalId=${encodeURIComponent(goalId)}`),
+    create: (data: {
+      goalId: string;
+      title: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      order?: number;
+    }) =>
+      request<GoalStepDto>("/goal-step", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: string,
+      data: {
+        title?: string;
+        description?: string | null;
+        startDate?: string | null;
+        endDate?: string | null;
+        order?: number;
+      }
+    ) =>
+      request<GoalStepDto>(`/goal-step/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request(`/goal-step/${id}`, { method: "DELETE" }),
   },
 
   activity: {

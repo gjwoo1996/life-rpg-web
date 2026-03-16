@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Character } from './character.entity';
 import { GoalAnalysis } from './goal-analysis.entity';
+import { GoalStep } from './goal-step.entity';
 
 @Entity('goals')
 export class Goal {
@@ -55,4 +56,7 @@ export class Goal {
 
   @OneToMany(() => GoalAnalysis, (a) => a.goal)
   goalAnalyses: GoalAnalysis[];
+
+  @OneToMany(() => GoalStep, (s) => s.goal)
+  steps: GoalStep[];
 }

@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { OllamaModule } from './ollama/ollama.module';
 import { CharacterModule } from './character/character.module';
 import { GoalModule } from './goal/goal.module';
+import { GoalStepModule } from './goal-step/goal-step.module';
 import { ActivityModule } from './activity/activity.module';
 import { AbilityModule } from './ability/ability.module';
 import { AnalysisModule } from './analysis/analysis.module';
@@ -19,6 +20,7 @@ import {
   AbilityStat,
   DailyAnalysis,
   GoalAnalysis,
+  GoalStep,
 } from './entities';
 
 const rootEnvPath = path.join(__dirname, '../../.env');
@@ -42,6 +44,7 @@ const rootEnvPath = path.join(__dirname, '../../.env');
           AbilityStat,
           DailyAnalysis,
           GoalAnalysis,
+          GoalStep,
         ],
         synchronize: config.get('NODE_ENV') !== 'production',
       }),
@@ -50,6 +53,7 @@ const rootEnvPath = path.join(__dirname, '../../.env');
     OllamaModule,
     CharacterModule,
     GoalModule,
+    GoalStepModule,
     ActivityModule,
     AbilityModule,
     AnalysisModule,

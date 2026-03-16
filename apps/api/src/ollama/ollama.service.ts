@@ -12,7 +12,7 @@ const LLM_VERBOSE = process.env.LIFERPG_LLM_VERBOSE === 'true';
 const RESPONSE_PREVIEW_LEN = 200;
 
 const KOREAN_ONLY_SYSTEM =
-  'You must respond only in Korean. Do not use English, Japanese, or Chinese. All output must be in Korean. Never mix other languages.';
+  '반드시 한국어로만 답변해야 합니다. 영어, 일본어, 중국어 등 다른 언어를 사용하지 마세요. 출력 내용은 모두 한국어여야 하며, 다른 언어를 섞어 쓰지 마세요.';
 
 @Injectable()
 export class OllamaService {
@@ -118,18 +118,21 @@ export class OllamaService {
     activityContent: string,
     model = 'llama3.2',
   ): Promise<string> {
-    return this.generate(
-      model,
-      `Analyze the following activity log and provide a short summary or insight. Use line breaks between sentences if there are multiple.\n\n${activityContent}`,
-      KOREAN_ONLY_SYSTEM,
-    );
+    const prompt = `다음은 사용자의 활동 로그입니다. 이 활동의 핵심 내용과 인사이트를 2~3문장으로 간단히 정리해 주세요.
+
+활동 로그:
+${activityContent}
+
+요약/인사이트:`;
+    return this.generate(model, prompt, KOREAN_ONLY_SYSTEM);
   }
 
   /** 콘텐츠 요약 (life-rpg ai/prompt.rs build_summary_prompt 이식) - 한국어 한 문장 80자 이내 */
   async summarizeContent(content: string, model?: string): Promise<string> {
-    const prompt = `Summarize the following activity in Korean in one short sentence (under 80 characters). Reply with only the summary, no quotes or prefix.
-Activity: ${content}
-Summary:`;
+    const prompt = `다음 활동 내용을 한국어 한 문장(80자 이내)으로 짧게 요약해 주세요. 따옴표나 접두어 없이 요약 문장만 출력하세요.
+
+활동 내용: ${content}
+요약:`;
     return this.generateInKoreanOnly(prompt, model);
   }
 
@@ -148,11 +151,15 @@ Summary:`;
     const example = abilityNames
       .map((s, i) => `"${s}": ${(i + 1) % 4}`)
       .join(', ');
-    const prompt = `Analyze the following user activity and assign experience points (XP) to each skill.
-Activity: ${content}
-Return ONLY a JSON object with integer values (0-10) for these keys: ${keys}.
-Example: {${example}}
-Return only the JSON, no other text or language.`;
+    const prompt = `다음 활동 내용을 읽고 각 능력치별로 경험치(XP)를 0~30 사이의 정수로 배분해 주세요.
+
+활동 내용: ${content}
+
+반환 형식: 아래 능력 이름들을 키로 가지는 JSON 객체만 반환하세요. 값은 0~30 사이의 정수입니다.
+키 목록: ${keys}
+예시: {${example}}
+
+JSON 이외의 다른 설명이나 텍스트는 절대 포함하지 마세요.`;
     const text = await this.generateRaw(prompt, model);
     const jsonStr = text
       .trim()

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type GoalDto, type CharacterDto } from "@/lib/api";
@@ -34,6 +34,7 @@ function isSameMonth(d: Date, year: number, month: number): boolean {
 
 function ActivityContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const characterId = searchParams.get("characterId");
   const [goals, setGoals] = useState<GoalDto[]>([]);
   const [character, setCharacter] = useState<CharacterDto | null>(null);
@@ -42,10 +43,24 @@ function ActivityContent() {
   const [month, setMonth] = useState(() => new Date().getMonth());
 
   useEffect(() => {
-    if (!characterId) return;
+    if (!characterId) {
+      api.character
+        .list()
+        .then((list) => {
+          if (list.length === 1) {
+            const only = list[0];
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("characterId", only.id);
+            router.replace(`/activity?${params.toString()}`);
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+
     api.goal.list(characterId).then(setGoals).catch(() => setGoals([]));
     api.character.get(characterId).then(setCharacter).catch(() => setCharacter(null));
-  }, [characterId]);
+  }, [characterId, router, searchParams]);
 
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);

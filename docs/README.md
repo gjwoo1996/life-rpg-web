@@ -1,5 +1,7 @@
 # life-rpg-web 문서
 
+## Habitica를 롤모델로 만든 웹서비스
+
 Next.js + NestJS로 마이그레이션하는 life-rpg 웹 버전 프로젝트의 계획 및 설정 문서입니다.
 
 ## 문서 목차
@@ -12,6 +14,7 @@ Next.js + NestJS로 마이그레이션하는 life-rpg 웹 버전 프로젝트의
 | [03-migration-order.md](03-migration-order.md) | 마이그레이션 작업 순서 |
 | [04-devcontainer.md](04-devcontainer.md) | DevContainer 설정 상세 (Common_Repo 연동) |
 | [05-migration-gap-and-supplement.md](05-migration-gap-and-supplement.md) | 마이그레이션 격차 분석 및 보완 계획 (UI·API·DB) |
+| [업데이트/README.md](업데이트/README.md) | 버전별 업데이트 내역 (0.0.0~) |
 
 ## 요약
 

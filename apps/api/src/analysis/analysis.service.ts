@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ActivityLog } from '../entities/activity-log.entity';
 import { DailyAnalysis } from '../entities/daily-analysis.entity';
 import { Goal } from '../entities/goal.entity';
+import { GoalStep } from '../entities/goal-step.entity';
 import { GoalAnalysis } from '../entities/goal-analysis.entity';
 import { OllamaService } from '../ollama/ollama.service';
 import { CreateDailyAnalysisDto } from './dto/create-daily-analysis.dto';
@@ -20,6 +21,8 @@ export class AnalysisService {
     private readonly activityRepo: Repository<ActivityLog>,
     @InjectRepository(Goal)
     private readonly goalRepo: Repository<Goal>,
+    @InjectRepository(GoalStep)
+    private readonly goalStepRepo: Repository<GoalStep>,
     private readonly ollama: OllamaService,
   ) {}
 
@@ -128,6 +131,23 @@ export class AnalysisService {
           : `[${d}] ${l.content}`;
       })
       .join('\n');
+
+    const steps = await this.goalStepRepo.find({
+      where: { goalId },
+      order: { order: 'ASC', startDate: 'ASC', createdAt: 'ASC' },
+    });
+    const stepsText = steps
+      .map((s, idx) => {
+        const baseDate = s.startDate ?? s.endDate ?? null;
+        const d = baseDate
+          ? new Date(baseDate).toISOString().slice(0, 10)
+          : '';
+        const idxLabel = idx + 1;
+        return d
+          ? `${idxLabel}. [${d}] ${s.title} - ${s.description ?? ''}`
+          : `${idxLabel}. ${s.title} - ${s.description ?? ''}`;
+      })
+      .join('\n');
     const sorted = (goal.goalAnalyses ?? []).sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -142,13 +162,17 @@ export class AnalysisService {
           goal.title,
           targetSkill,
           previousContext,
-          activitiesText,
+          stepsText
+            ? `${activitiesText}\n\n[Steps]\n${stepsText}`
+            : activitiesText,
         )
       : this.ollama.buildGoalAnalysisPromptFixed(
           goal.title,
           targetSkill,
           previousContext,
-          activitiesText,
+          stepsText
+            ? `${activitiesText}\n\n[Steps]\n${stepsText}`
+            : activitiesText,
           goal.goalAnalysisUserInstruction ?? null,
         );
 

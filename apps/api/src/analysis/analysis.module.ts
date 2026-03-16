@@ -3,13 +3,20 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLog } from '../entities/activity-log.entity';
 import { DailyAnalysis } from '../entities/daily-analysis.entity';
 import { Goal } from '../entities/goal.entity';
+import { GoalStep } from '../entities/goal-step.entity';
 import { GoalAnalysis } from '../entities/goal-analysis.entity';
 import { AnalysisController } from './analysis.controller';
 import { AnalysisService } from './analysis.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DailyAnalysis, GoalAnalysis, ActivityLog, Goal]),
+    TypeOrmModule.forFeature([
+      DailyAnalysis,
+      GoalAnalysis,
+      ActivityLog,
+      Goal,
+      GoalStep,
+    ]),
   ],
   controllers: [AnalysisController],
   providers: [AnalysisService],

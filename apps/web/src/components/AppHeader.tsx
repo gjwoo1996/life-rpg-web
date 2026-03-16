@@ -56,6 +56,7 @@ export function AppHeader({ character }: AppHeaderProps) {
 
   const activityHref = character ? `/activity?characterId=${character.id}` : "/activity";
   const analysisHref = character ? `/analysis?characterId=${character.id}` : "/analysis";
+  const growthHref = character ? `/growth?characterId=${character.id}` : "/growth";
 
   return (
     <>
@@ -132,6 +133,32 @@ export function AppHeader({ character }: AppHeaderProps) {
               홈
             </Link>
             <Link
+              href="/character-test"
+              className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              onClick={() => setSideOpen(false)}
+            >
+              <svg
+                className="w-5 h-5 shrink-0 text-zinc-500 dark:text-zinc-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 17a4 4 0 100-8 4 4 0 000 8z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              캐릭터 성장 테스트
+            </Link>
+            <Link
               href={analysisHref}
               className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               onClick={() => setSideOpen(false)}
@@ -170,6 +197,32 @@ export function AppHeader({ character }: AppHeaderProps) {
                 />
               </svg>
               활동 캘린더
+            </Link>
+            <Link
+              href={growthHref}
+              className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              onClick={() => setSideOpen(false)}
+            >
+              <svg
+                className="w-5 h-5 shrink-0 text-zinc-500 dark:text-zinc-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 17l6-6 4 4 8-8"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 7h4v4"
+                />
+              </svg>
+              성장 그래프
             </Link>
             <Link
               href="/settings"
