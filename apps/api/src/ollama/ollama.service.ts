@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PromptBuilder } from './prompt-builder';
+import { tryRuleBased, filterToAbilities } from './xp-rules';
 
 export interface OllamaChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -143,9 +145,9 @@ ${activityContent}
     model?: string,
   ): Promise<Record<string, number>> {
     if (abilityNames.length === 0) return {};
-    const rule = this.tryRuleBased(content);
+    const rule = tryRuleBased(content);
     if (rule) {
-      return this.filterToAbilities(rule, abilityNames);
+      return filterToAbilities(rule, abilityNames);
     }
     const keys = abilityNames.map((s) => `"${s}"`).join(', ');
     const example = abilityNames
@@ -171,7 +173,7 @@ JSON 이외의 다른 설명이나 텍스트는 절대 포함하지 마세요.`;
     try {
       parsed = JSON.parse(jsonStr) as Record<string, unknown>;
     } catch {
-      return this.filterToAbilities({}, abilityNames);
+      return filterToAbilities({}, abilityNames);
     }
     const result: Record<string, number> = {};
     for (const name of abilityNames) {
@@ -181,109 +183,21 @@ JSON 이외의 다른 설명이나 텍스트는 절대 포함하지 마세요.`;
     return result;
   }
 
-  private filterToAbilities(
-    m: Record<string, number>,
-    abilityNames: string[],
-  ): Record<string, number> {
-    const out: Record<string, number> = {};
-    for (const name of abilityNames) {
-      out[name] = m[name] ?? 0;
-    }
-    return out;
-  }
+  // --- 프롬프트 빌더 (PromptBuilder 위임) ---
 
-  /** 규칙 기반 XP (life-rpg ai/rules.rs 이식) - 매칭 시 LLM 호출 생략 */
-  private tryRuleBased(content: string): Record<string, number> | null {
-    const lower = content.toLowerCase();
-    // "단어 N개" / "N개 단어"
-    const wordMatch = lower.match(/(\d+)\s*개?\s*단어|단어\s*(\d+)\s*개?/);
-    if (wordMatch) {
-      const n = parseInt(wordMatch[1] || wordMatch[2] || '0', 10);
-      if (n > 0) {
-        const xp = Math.max(1, Math.floor(n * 0.1));
-        return {
-          intelligence: xp,
-          discipline: Math.floor(xp / 2),
-          focus: 0,
-          knowledge: Math.floor(xp / 2),
-          health: 0,
-        };
-      }
-    }
-    // "N시간 공부" / 공부·학습·study
-    const hourMatch = lower.match(/(\d+)\s*시간/);
-    if (
-      hourMatch &&
-      (lower.includes('공부') ||
-        lower.includes('학습') ||
-        lower.includes('study'))
-    ) {
-      const n = parseInt(hourMatch[1] || '0', 10);
-      if (n > 0) {
-        const xp = Math.max(1, n * 2);
-        return {
-          intelligence: xp,
-          discipline: xp,
-          focus: Math.floor(xp / 2),
-          knowledge: xp,
-          health: 0,
-        };
-      }
-    }
-    // "N분" 운동 / exercise
-    if (lower.includes('운동') || lower.includes('exercise')) {
-      const minMatch = lower.match(/(\d+)\s*분/);
-      if (minMatch) {
-        const n = parseInt(minMatch[1] || '0', 10);
-        if (n > 0) {
-          const xp = Math.max(1, Math.floor(n / 10));
-          return {
-            intelligence: 0,
-            discipline: Math.floor(xp / 2),
-            focus: 0,
-            knowledge: 0,
-            health: xp,
-          };
-        }
-      }
-    }
-    return null;
-  }
-
-  /** 일일 분석 프롬프트 (life-rpg ai/prompt.rs build_daily_analysis_prompt) */
   buildDailyAnalysisPrompt(activitiesText: string): string {
-    return `The following are the user's activity logs for one day. Write a brief 2-3 sentence analysis of the day (what was done, progress, or encouragement). 반드시 한국어로만 작성하세요. 일본어·중국어를 사용하지 마세요. Reply in Korean only.
-
-Formatting: Write each sentence on a new line. Use line breaks between sentences so the answer is easy to read. Do not output one long continuous line.
-
-Activities:
-${activitiesText}
-Analysis:`;
+    return PromptBuilder.buildDailyAnalysis(activitiesText);
   }
 
-  /** 목표 분석 프롬프트 (life-rpg ai/prompt.rs build_goal_analysis_prompt) */
   buildGoalAnalysisPrompt(
     goalName: string,
     targetAbility: string,
     previousContext: string,
     activitiesText: string,
   ): string {
-    const prevBlock = previousContext
-      ? `Previous summary/context:\n${previousContext}\n\n`
-      : '';
-    const activities = activitiesText || '(No activities yet)';
-    return `Analyze progress toward this goal and give brief feedback.
-Goal: ${goalName}
-Target skill/ability: ${targetAbility}
-${prevBlock}Recent activities:
-${activities}
-
-Write 2-4 sentences: progress so far, what to improve, and encouragement. 반드시 한국어로만 작성하세요. 일본어·중국어를 사용하지 마세요. Reply in Korean only. No prefix or label.
-
-Formatting: Write each sentence on a new line. Use line breaks between sentences for readability. Do not output one long continuous line.`;
+    return PromptBuilder.buildGoalAnalysis(goalName, targetAbility, previousContext, activitiesText);
   }
 
-  /** 사용자 정의 목표 분석 프롬프트 템플릿에 플레이스홀더 치환 */
   buildGoalAnalysisPromptFromTemplate(
     template: string,
     goalName: string,
@@ -291,17 +205,9 @@ Formatting: Write each sentence on a new line. Use line breaks between sentences
     previousContext: string,
     activitiesText: string,
   ): string {
-    return template
-      .replace(/\{\{goalName\}\}/g, goalName)
-      .replace(/\{\{targetAbility\}\}/g, targetAbility)
-      .replace(/\{\{previousContext\}\}/g, previousContext)
-      .replace(
-        /\{\{activitiesText\}\}/g,
-        activitiesText || '(No activities yet)',
-      );
+    return PromptBuilder.buildGoalAnalysisFromTemplate(template, goalName, targetAbility, previousContext, activitiesText);
   }
 
-  /** 고정 구조 목표 분석 프롬프트 (백엔드 고정 + 사용자 추가 지시) */
   buildGoalAnalysisPromptFixed(
     goalName: string,
     targetAbility: string,
@@ -309,18 +215,6 @@ Formatting: Write each sentence on a new line. Use line breaks between sentences
     activitiesText: string,
     userInstruction: string | null,
   ): string {
-    const prevBlock = previousContext
-      ? `이전 분석 요약:\n${previousContext}\n\n`
-      : '';
-    const activities = activitiesText || '(아직 활동 없음)';
-    const userBlock = userInstruction?.trim()
-      ? `\n추가로 다음을 반영해 주세요: ${userInstruction.trim()}\n\n`
-      : '';
-    return `목표: ${goalName}
-스킬/능력: ${targetAbility}
-
-${prevBlock}기간 내 활동:
-${activities}
-${userBlock}위 내용을 바탕으로 진행 상황, 개선점, 격려를 2~4문장 한국어로 작성해 주세요. 문장마다 줄바꿈 해 주세요.`;
+    return PromptBuilder.buildGoalAnalysisFixed(goalName, targetAbility, previousContext, activitiesText, userInstruction);
   }
 }

@@ -26,7 +26,7 @@ export class ActivityController {
     @Query('toDate') toDate?: string,
   ) {
     if (characterId && fromDate && toDate) {
-      return this.activityService.findByCharacterAndDateRange(
+      return this.activityService.findForDateRange(
         characterId,
         fromDate,
         toDate,

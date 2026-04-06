@@ -36,11 +36,12 @@ export class GoalService {
     return this.repo.find({
       where: { characterId },
       order: { createdAt: 'DESC' },
+      relations: ['steps'],
     });
   }
 
   /** Goals where date is within [startDate, endDate] (life-rpg list_goals_for_date). */
-  async listGoalsForDate(characterId: string, date: string) {
+  async findForDate(characterId: string, date: string) {
     return this.repo
       .createQueryBuilder('goal')
       .where('goal.characterId = :characterId', { characterId })

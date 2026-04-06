@@ -21,6 +21,7 @@ export default function GoalStepsPage() {
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!goalId) return;
@@ -87,6 +88,18 @@ export default function GoalStepsPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleComplete = async (step: GoalStepDto) => {
+    setTogglingId(step.id);
+    try {
+      const updated = await api.goalStep.update(step.id, { completed: !step.completed });
+      setSteps((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } catch {
+      // ignore
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -167,6 +180,36 @@ export default function GoalStepsPage() {
           </Link>
         </div>
 
+        {steps.length > 0 && (() => {
+          const total = steps.length;
+          const completed = steps.filter((s) => s.completed).length;
+          const pct = Math.round((completed / total) * 100);
+          return (
+            <div className="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-4 py-3 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">목표 진행도</span>
+                <span className={`font-semibold ${pct === 100 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                  {pct}% ({completed}/{total} 스텝 완료)
+                </span>
+              </div>
+              <div className="h-2.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor: pct === 100 ? "#10b981" : (goal?.calendarColor ?? "#6366f1"),
+                  }}
+                />
+              </div>
+              {pct === 100 && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  모든 스텝을 완료했습니다!
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
         <section className="grid grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6 items-start">
           <div className="space-y-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-4">
             <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-1">
@@ -181,31 +224,54 @@ export default function GoalStepsPage() {
                 {steps.map((s) => (
                   <li
                     key={s.id}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-800/40 px-3 py-2"
+                    className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 transition-colors ${
+                      s.completed
+                        ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20"
+                        : "border-zinc-200 dark:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-800/40"
+                    }`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                          #{s.order}
-                        </span>
-                        <p className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
-                          {s.title}
-                        </p>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleComplete(s)}
+                        disabled={togglingId === s.id}
+                        aria-label={s.completed ? "완료 취소" : "완료 표시"}
+                        className={`mt-0.5 w-4 h-4 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                          s.completed
+                            ? "bg-emerald-500 border-emerald-500"
+                            : "border-zinc-400 dark:border-zinc-500 hover:border-emerald-400"
+                        }`}
+                      >
+                        {s.completed && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8">
+                            <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                            #{s.order}
+                          </span>
+                          <p className={`font-medium text-sm ${s.completed ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-900 dark:text-zinc-100"}`}>
+                            {s.title}
+                          </p>
+                        </div>
+                        {(s.startDate || s.endDate) && (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            기간:{" "}
+                            {s.startDate ? s.startDate.slice(0, 10) : "시작일 미설정"} ~{" "}
+                            {s.endDate ? s.endDate.slice(0, 10) : "종료일 미설정"}
+                          </p>
+                        )}
+                        {s.description && (
+                          <p className="text-xs text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap">
+                            {s.description}
+                          </p>
+                        )}
                       </div>
-                      {(s.startDate || s.endDate) && (
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                          기간:{" "}
-                          {s.startDate ? s.startDate.slice(0, 10) : "시작일 미설정"} ~{" "}
-                          {s.endDate ? s.endDate.slice(0, 10) : "종료일 미설정"}
-                        </p>
-                      )}
-                      {s.description && (
-                        <p className="text-xs text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap">
-                          {s.description}
-                        </p>
-                      )}
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleEdit(s)}

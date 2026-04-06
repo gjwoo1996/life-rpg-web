@@ -26,7 +26,7 @@ export class AnalysisService {
     private readonly ollama: OllamaService,
   ) {}
 
-  async getDailyAnalysis(characterId: string, date: string) {
+  async findDailyAnalysis(characterId: string, date: string) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return this.dailyRepo.findOne({
@@ -35,7 +35,7 @@ export class AnalysisService {
     });
   }
 
-  getGoalAnalysis(goalId: string) {
+  findGoalAnalysis(goalId: string) {
     return this.goalAnalysisRepo.find({
       where: { goalId },
       order: { createdAt: 'DESC' },

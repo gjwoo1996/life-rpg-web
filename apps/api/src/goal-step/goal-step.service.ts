@@ -44,6 +44,7 @@ export class GoalStepService {
   }
 
   async create(dto: CreateGoalStepDto) {
+    if (!dto.goalId) throw new BadRequestException('goalId is required');
     const goal = await this.goalRepo.findOne({ where: { id: dto.goalId } });
     if (!goal) throw new NotFoundException('Goal not found');
 

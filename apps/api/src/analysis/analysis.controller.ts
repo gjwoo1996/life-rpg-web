@@ -12,12 +12,12 @@ export class AnalysisController {
     @Query('characterId') characterId: string,
     @Query('date') date: string,
   ) {
-    return this.analysisService.getDailyAnalysis(characterId, date);
+    return this.analysisService.findDailyAnalysis(characterId, date);
   }
 
   @Get('goal/:goalId')
   getGoalAnalysis(@Param('goalId') goalId: string) {
-    return this.analysisService.getGoalAnalysis(goalId);
+    return this.analysisService.findGoalAnalysis(goalId);
   }
 
   @Post('daily')

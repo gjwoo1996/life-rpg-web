@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLog } from '../entities/activity-log.entity';
 import { OllamaModule } from '../ollama/ollama.module';
 import { AbilityModule } from '../ability/ability.module';
-import { CharacterModule } from '../character/character.module';
 import { GoalModule } from '../goal/goal.module';
 import { AnalysisModule } from '../analysis/analysis.module';
 import { ActivityController } from './activity.controller';
@@ -14,7 +13,6 @@ import { ActivityService } from './activity.service';
     TypeOrmModule.forFeature([ActivityLog]),
     OllamaModule,
     AbilityModule,
-    CharacterModule,
     GoalModule,
     AnalysisModule,
   ],

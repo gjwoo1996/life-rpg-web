@@ -48,6 +48,7 @@ export type GoalDto = {
   goalAnalysisPromptTemplate?: string | null;
   goalAnalysisUserInstruction?: string | null;
   createdAt: string;
+  steps?: GoalStepDto[];
 };
 
 export type GoalStepDto = {
@@ -58,6 +59,7 @@ export type GoalStepDto = {
   startDate?: string | null;
   endDate?: string | null;
   order: number;
+  completed: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -149,6 +151,7 @@ export const api = {
         startDate?: string | null;
         endDate?: string | null;
         order?: number;
+        completed?: boolean;
       }
     ) =>
       request<GoalStepDto>(`/goal-step/${id}`, {

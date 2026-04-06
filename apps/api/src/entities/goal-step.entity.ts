@@ -36,6 +36,9 @@ export class GoalStep {
   @Column({ type: 'int', default: 0 })
   order: number;
 
+  @Column({ type: 'boolean', default: false })
+  completed: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
