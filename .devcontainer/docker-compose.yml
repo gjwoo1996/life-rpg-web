@@ -1,30 +1,33 @@
 services:
   workspace:
-    image: mcr.microsoft.com/devcontainers/base:ubuntu
+    # image: mcr.microsoft.com/devcontainers/base:ubuntu
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: sleep infinity
     env_file:
       - ../.env
     environment:
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/postgres
-      # Optional (shared network mode):
-      # - OLLAMA_HOST=http://ollama:11434
-      # - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      # Common_Repo stack on external network gw-shared-devnet (postgres, ollama)
+      - OLLAMA_HOST=http://ollama:11434
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
       - TZ=Asia/Seoul
     volumes:
-      - ..:/workspaces/life-rpg-web:cached
+      - ..:${containerWorkspaceFolder}:cached
+      - claude-config:/home/node/.claude
     ports:
       - "3000:3000"   # Next.js
       - "3001:3001"   # NestJS API
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Optional (shared network mode):
-    # networks:
-    #   - default
-    #   - shared-devnet
+    networks:
+      - default
+      - shared-devnet
 
-# Optional (shared network mode):
-# networks:
-#   shared-devnet:
-#     external: true
-#     name: gw-shared-devnet
+volumes:
+  claude-config:
+
+networks:
+  shared-devnet:
+    external: true
+    name: gw-shared-devnet

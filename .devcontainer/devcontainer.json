@@ -2,17 +2,11 @@
   "name": "Life RPG Web Dev",
   "dockerComposeFile": "docker-compose.yml",
   "service": "workspace",
-  "workspaceFolder": "/workspaces/life-rpg-web",
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "lts"
-    }
-  },
+  "workspaceFolder": "/home/vscode/${localWorkspaceFolderBasename}",
   "mounts": [
     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
   ],
   "forwardPorts": [3000, 3001],
-  "postCreateCommand": "if [ -f package.json ]; then npm install; fi",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -21,5 +15,7 @@
         "bradlc.vscode-tailwindcss"
       ]
     }
-  }
+  },
+  "initializeCommand": "bash ./.devcontainer/commands/initializeCommand.sh ${localWorkspaceFolder} ${containerWorkspaceFolder} ${localWorkspaceFolderBasename} ${containerWorkspaceFolderBasename}",
+  "postCreateCommand": "sudo chown -R node:node /home/node/.claude"
 }
