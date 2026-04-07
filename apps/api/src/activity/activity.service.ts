@@ -43,9 +43,11 @@ export class ActivityService {
     }
 
     let summary = '';
+    let ollamaFailed = false;
     try {
       summary = await this.ollama.summarizeContent(content);
     } catch {
+      ollamaFailed = true;
       summary = '';
     }
 
@@ -53,6 +55,7 @@ export class ActivityService {
     try {
       xpMap = await this.ollama.analyzeActivityXp(content, abilityNames);
     } catch {
+      ollamaFailed = true;
       xpMap = {};
     }
     const xpGained = Object.values(xpMap).reduce((a, b) => a + b, 0);
@@ -95,7 +98,11 @@ export class ActivityService {
       // ignore
     }
 
-    return log;
+    const abilityXpChanges = Object.entries(xpMap)
+      .filter(([, xp]) => xp > 0)
+      .map(([name, xp]) => ({ name, xp }));
+
+    return { ...log, abilityXpChanges, ollamaFailed };
   }
 
   private async applyAbilityXp(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, type ActivityCreateResultDto } from "@/lib/api";
 
 function todayYmd(): string {
   const d = new Date();
@@ -14,13 +14,26 @@ function todayYmd(): string {
   );
 }
 
+function nDaysAgoYmd(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return (
+    d.getFullYear() +
+    "-" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(d.getDate()).padStart(2, "0")
+  );
+}
+
 interface ActivityLogFormProps {
   characterId: string;
-  onCreated?: () => void;
+  onCreated?: (result: ActivityCreateResultDto) => void;
 }
 
 export function ActivityLogForm({ characterId, onCreated }: ActivityLogFormProps) {
   const [content, setContent] = useState("");
+  const [date, setDate] = useState(todayYmd);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,14 +43,13 @@ export function ActivityLogForm({ characterId, onCreated }: ActivityLogFormProps
     setError(null);
     setLoading(true);
     try {
-      const date = todayYmd();
-      await api.activity.create({
+      const result = await api.activity.create({
         characterId,
         date,
         content: content.trim(),
       });
       setContent("");
-      onCreated?.();
+      onCreated?.(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -46,19 +58,32 @@ export function ActivityLogForm({ characterId, onCreated }: ActivityLogFormProps
   };
 
   const today = todayYmd();
+  const minDate = nDaysAgoYmd(7);
 
   return (
     <form
       onSubmit={handleSubmit}
       className="space-y-4 p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-800/30 border border-zinc-200 dark:border-zinc-700"
     >
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-zinc-600 dark:text-zinc-400">날짜</span>
-        <span className="font-medium text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-600">
-          {today}
-        </span>
+      <div className="flex items-center gap-2 text-sm flex-wrap">
+        <label
+          htmlFor="activity-date"
+          className="text-zinc-600 dark:text-zinc-400 shrink-0"
+        >
+          날짜
+        </label>
+        <input
+          id="activity-date"
+          type="date"
+          value={date}
+          min={minDate}
+          max={today}
+          onChange={(e) => setDate(e.target.value)}
+          disabled={loading}
+          className="font-medium text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
+        />
         <span className="text-zinc-400 dark:text-zinc-500 text-xs">
-          (오늘만 기록 가능)
+          (오늘 포함 최근 7일 이내)
         </span>
       </div>
 
@@ -85,7 +110,7 @@ export function ActivityLogForm({ characterId, onCreated }: ActivityLogFormProps
           id="activity-content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="오늘 한 활동을 기록하세요. 저장 시 AI가 분석해 경험치를 부여합니다."
+          placeholder="활동을 기록하세요. 저장 시 AI가 분석해 경험치를 부여합니다."
           rows={4}
           className="w-full px-3 py-2 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
           disabled={loading}

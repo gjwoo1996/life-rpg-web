@@ -1,4 +1,4 @@
-import { IsString, IsNumber } from 'class-validator';
+import { IsString, IsNumber, Min } from 'class-validator';
 
 export class CreateAbilityStatDto {
   @IsString()
@@ -8,5 +8,6 @@ export class CreateAbilityStatDto {
   abilityId: string;
 
   @IsNumber()
+  @Min(0)
   xp: number;
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   api,
@@ -24,13 +25,16 @@ function todayYmd(): string {
   );
 }
 
-export default function CharacterDetailPage() {
+function CharacterDetailContent() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const [character, setCharacter] = useState<CharacterDto | null>(null);
   const [goals, setGoals] = useState<GoalDto[]>([]);
   const [todayLogs, setTodayLogs] = useState<ActivityLogDto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [abilityRefreshKey, setAbilityRefreshKey] = useState(0);
 
   const loadCharacter = useCallback(() => {
     if (!id) return;
@@ -65,6 +69,16 @@ export default function CharacterDetailPage() {
     }
   }, [character?.id, loadGoals, loadTodayLogs]);
 
+  // 활동 저장 후 돌아왔을 때 능력치 재로드
+  useEffect(() => {
+    if (searchParams.get("refresh") === "1" && character?.id) {
+      loadCharacter();
+      loadTodayLogs();
+      setAbilityRefreshKey((k) => k + 1);
+      router.replace(`/characters/${id}`);
+    }
+  }, [searchParams, character?.id, id, loadCharacter, loadTodayLogs, router]);
+
   if (error)
     return (
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -83,7 +97,7 @@ export default function CharacterDetailPage() {
     <>
       <AppHeader character={character} />
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
-        <CharacterView character={character} goals={goals} />
+        <CharacterView character={character} goals={goals} refreshKey={abilityRefreshKey} />
 
       <section className="space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -157,5 +171,13 @@ export default function CharacterDetailPage() {
       </section>
       </div>
     </>
+  );
+}
+
+export default function CharacterDetailPage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-zinc-500 dark:text-zinc-400">로딩 중...</p>}>
+      <CharacterDetailContent />
+    </Suspense>
   );
 }

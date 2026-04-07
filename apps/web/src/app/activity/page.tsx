@@ -242,17 +242,7 @@ function ActivityContent() {
                       {g.title}
                     </span>
                   ))}
-                  {hasActivity && dayGoals.length === 0 && (
-                    <span
-                      className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate"
-                      style={{
-                        backgroundColor: activityCellColor,
-                      }}
-                    >
-                      활동 {logCount}개
-                    </span>
-                  )}
-                  {hasActivity && dayGoals.length > 0 && (
+                  {hasActivity && (
                     <span
                       className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate"
                       style={{

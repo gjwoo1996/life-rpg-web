@@ -43,6 +43,26 @@ export class AnalysisService {
     });
   }
 
+  /** Batch: get latest analysis content per goal for a character. Returns { [goalId]: content | null }. */
+  async findGoalAnalysesBatch(
+    characterId: string,
+  ): Promise<Record<string, string | null>> {
+    const goals = await this.goalRepo.find({ where: { characterId } });
+    if (goals.length === 0) return {};
+    const goalIds = goals.map((g) => g.id);
+    const analyses = await this.goalAnalysisRepo
+      .createQueryBuilder('ga')
+      .where('ga.goalId IN (:...goalIds)', { goalIds })
+      .orderBy('ga.createdAt', 'DESC')
+      .getMany();
+    const map: Record<string, string | null> = {};
+    for (const id of goalIds) map[id] = null;
+    for (const a of analyses) {
+      if (map[a.goalId] === null) map[a.goalId] = a.content;
+    }
+    return map;
+  }
+
   createDailyAnalysis(dto: CreateDailyAnalysisDto) {
     return this.dailyRepo.save(
       this.dailyRepo.create({

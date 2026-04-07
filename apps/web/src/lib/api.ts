@@ -77,6 +77,19 @@ export type ActivityLogDto = {
 
 export type AbilityStatDto = { abilityId: string; name: string; xp: number };
 
+export type ActivityCreateResultDto = ActivityLogDto & {
+  abilityXpChanges: { name: string; xp: number }[];
+  ollamaFailed: boolean;
+};
+
+export type GoalAnalysisDto = {
+  id: string;
+  goalId: string;
+  content: string;
+  lastAnalyzedAt?: string | null;
+  createdAt: string;
+};
+
 export const api = {
   character: {
     list: () => request<CharacterDto[]>("/character"),
@@ -183,7 +196,7 @@ export const api = {
       date: string;
       content: string;
     }) =>
-      request<ActivityLogDto>("/activity", {
+      request<ActivityCreateResultDto>("/activity", {
         method: "POST",
         body: JSON.stringify(data),
       }),
@@ -221,7 +234,11 @@ export const api = {
         `/analysis/daily?characterId=${encodeURIComponent(characterId)}&date=${encodeURIComponent(date)}`
       ),
     getGoal: (goalId: string) =>
-      request(`/analysis/goal/${goalId}`),
+      request<GoalAnalysisDto[]>(`/analysis/goal/${goalId}`),
+    getGoalsBatch: (characterId: string) =>
+      request<Record<string, string | null>>(
+        `/analysis/goals?characterId=${encodeURIComponent(characterId)}`
+      ),
     generateDaily: (characterId: string, date: string) =>
       request("/analysis/daily/generate", {
         method: "POST",

@@ -13,20 +13,22 @@ function levelFromXp(xp: number): number {
 interface CharacterViewProps {
   character: CharacterDto;
   goals?: GoalDto[];
+  refreshKey?: number;
 }
 
-export function CharacterView({ character, goals = [] }: CharacterViewProps) {
+export function CharacterView({ character, goals = [], refreshKey }: CharacterViewProps) {
   const [abilityStats, setAbilityStats] = useState<AbilityStatDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!character?.id) return;
+    setLoading(true);
     api.ability
       .getStats(character.id)
       .then(setAbilityStats)
       .catch(() => setAbilityStats([]))
       .finally(() => setLoading(false));
-  }, [character?.id]);
+  }, [character?.id, refreshKey]);
 
   const level = character.level ?? 1;
   const xp = character.xp ?? 0;

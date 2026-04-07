@@ -15,6 +15,11 @@ export class AnalysisController {
     return this.analysisService.findDailyAnalysis(characterId, date);
   }
 
+  @Get('goals')
+  getGoalAnalysesBatch(@Query('characterId') characterId: string) {
+    return this.analysisService.findGoalAnalysesBatch(characterId);
+  }
+
   @Get('goal/:goalId')
   getGoalAnalysis(@Param('goalId') goalId: string) {
     return this.analysisService.findGoalAnalysis(goalId);
