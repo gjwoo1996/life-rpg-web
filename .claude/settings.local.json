@@ -14,7 +14,8 @@
       "Bash(git push:*)",
       "Read(//home/vscode/**)",
       "Read(//home/vscode/.config/claude/**)",
-      "Bash(claude --version)"
+      "Bash(claude --version)",
+      "Bash(git:*)"
     ]
   }
 }

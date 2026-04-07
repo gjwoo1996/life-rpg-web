@@ -2,8 +2,9 @@
 # typescript-node: Node LTS + global TypeScript (tsc); claude-code is an extra cached layer.
 FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
 
-RUN npm install -g @anthropic-ai/claude-code
+# node 유저(UID 1000)를 vscode로 리네임하여 workspaceFolder(/home/vscode)와 경로 통일
+RUN usermod -l vscode -d /home/vscode -m node \
+    && groupmod -n vscode node \
+    && find /etc/sudoers.d -type f -exec sed -i 's/\bnode\b/vscode/g' {} + 2>/dev/null || true
 
-# Named volume이 빈 상태로 처음 생성될 때 Docker가 이 디렉토리 권한을 복사함.
-# node 유저(uid=1000)가 Claude Code 설정/인증 파일을 쓸 수 있도록 미리 소유권 설정.
-RUN mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude
+RUN npm install -g @anthropic-ai/claude-code
