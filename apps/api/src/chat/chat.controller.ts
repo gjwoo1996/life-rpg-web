@@ -87,7 +87,7 @@ export class ChatController {
   @UseInterceptors(
     FileInterceptor('image', {
       storage: memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024 },
+      limits: { fileSize: 20 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
           return cb(new BadRequestException('이미지 파일만 허용됩니다.'), false);
