@@ -1,88 +1,32 @@
 /** 모든 LLM 프롬프트 생성 로직 (순수 함수) */
 export class PromptBuilder {
-  /** 일일 분석 프롬프트 (life-rpg ai/prompt.rs build_daily_analysis_prompt) */
-  static buildDailyAnalysis(activitiesText: string): string {
-    return `당신은 일본어 공부를 돕는 학습 코치입니다.
-아래는 사용자의 하루 활동 로그입니다. 무엇을 공부했는지, 어떤 진전이 있었는지, 다음에 무엇을 보완하면 좋은지 2~3문장으로 짧게 분석해 주세요.
+  static buildJlptAnalysis(userMessagesText: string): string {
+    return `당신은 일본어 능력 평가 전문가입니다.
+아래는 학습자가 일본어 학습 채팅에서 작성한 메시지 전체입니다.
 
-출력 규칙:
-- 설명과 피드백은 한국어로 작성합니다.
-- 로그에 등장한 일본어 단어, 문장, 문법명은 필요한 경우 원문 그대로 인용할 수 있습니다.
-- 문장마다 줄바꿈하고, 접두어·라벨 없이 바로 답변합니다.
+학습자 메시지:
+${userMessagesText}
 
-활동 로그:
-${activitiesText}
+위 내용을 분석하여 학습자의 JLPT 수준을 평가하고 아래 JSON 형식으로만 응답하세요.
 
-일일 분석:`;
-  }
+응답 형식:
+{
+  "level": "N3",
+  "vocabularyScore": 60,
+  "grammarScore": 55,
+  "readingScore": 50,
+  "totalScore": 55,
+  "detail": "한국어로 2~3문장 분석 설명"
+}
 
-  /** 목표 분석 프롬프트 (life-rpg ai/prompt.rs build_goal_analysis_prompt) */
-  static buildGoalAnalysis(
-    goalName: string,
-    targetAbility: string,
-    previousContext: string,
-    activitiesText: string,
-  ): string {
-    const prevBlock = previousContext
-      ? `이전 분석 요약:\n${previousContext}\n\n`
-      : '';
-    const activities = activitiesText || '(아직 활동 없음)';
-    return `당신은 일본어 공부 목표를 점검하는 학습 코치입니다.
-목표: ${goalName}
-집중 영역: ${targetAbility}
+평가 기준:
+- vocabularyScore: 사용 어휘의 다양성과 정확성 (0~100)
+- grammarScore: 문법 구조의 복잡성과 정확성 (0~100)
+- readingScore: 문장 구성과 독해 수준 반영 (0~100)
+- totalScore: 세 점수의 평균
+- level: totalScore 기준 N5(0~39), N4(40~54), N3(55~69), N2(70~84), N1(85~100)
 
-${prevBlock}최근 활동:
-${activities}
-
-출력 규칙:
-- 진행 상황, 보완점, 격려를 2~4문장으로 작성합니다.
-- 설명은 한국어로 작성합니다.
-- 일본어 단어, 예문, 활용형이 필요하면 일본어 원문을 그대로 포함할 수 있습니다.
-- 문장마다 줄바꿈하고, 접두어·라벨 없이 바로 답변합니다.`;
-  }
-
-  /** 사용자 정의 목표 분석 프롬프트 템플릿에 플레이스홀더 치환 */
-  static buildGoalAnalysisFromTemplate(
-    template: string,
-    goalName: string,
-    targetAbility: string,
-    previousContext: string,
-    activitiesText: string,
-  ): string {
-    return template
-      .replace(/\{\{goalName\}\}/g, goalName)
-      .replace(/\{\{targetAbility\}\}/g, targetAbility)
-      .replace(/\{\{previousContext\}\}/g, previousContext)
-      .replace(
-        /\{\{activitiesText\}\}/g,
-        activitiesText || '(No activities yet)',
-      );
-  }
-
-  /** 고정 구조 목표 분석 프롬프트 (백엔드 고정 + 사용자 추가 지시) */
-  static buildGoalAnalysisFixed(
-    goalName: string,
-    targetAbility: string,
-    previousContext: string,
-    activitiesText: string,
-    userInstruction: string | null,
-  ): string {
-    const prevBlock = previousContext
-      ? `이전 분석 요약:\n${previousContext}\n\n`
-      : '';
-    const activities = activitiesText || '(아직 활동 없음)';
-    const userBlock = userInstruction?.trim()
-      ? `\n추가로 다음을 반영해 주세요: ${userInstruction.trim()}\n\n`
-      : '';
-    return `당신은 일본어 공부 목표를 함께 점검하는 학습 코치입니다.
-목표: ${goalName}
-스킬/능력: ${targetAbility}
-
-${prevBlock}기간 내 활동:
-${activities}
-${userBlock}위 내용을 바탕으로 진행 상황, 개선점, 격려를 2~4문장으로 작성해 주세요.
-설명은 한국어로 작성하고, 필요한 일본어 단어·예문·활용형은 원문 그대로 포함할 수 있습니다.
-문장마다 줄바꿈해 주세요.`;
+JSON 외 다른 텍스트는 절대 포함하지 마세요.`;
   }
 
   static buildJapaneseWordExplanation(term: string): string {

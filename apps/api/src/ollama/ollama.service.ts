@@ -1,16 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { logError, logInfo, logWarn } from '../logging/structured-logger';
 import { PromptBuilder } from './prompt-builder';
-import { tryRuleBased, filterToAbilities } from './xp-rules';
 
 export interface OllamaChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  images?: string[];
 }
 
 const DEFAULT_MODEL = process.env.LIFERPG_LLM_MODEL_DEFAULT || 'qwen3:8b';
 const FALLBACK_MODEL =
   process.env.LIFERPG_LLM_MODEL_FALLBACK || 'qwen2.5:7b';
+const IMAGE_MODEL = process.env.LIFERPG_LLM_MODEL_IMAGE || 'llava:7b';
 
 const LLM_VERBOSE = process.env.LIFERPG_LLM_VERBOSE === 'true';
 const RESPONSE_PREVIEW_LEN = 200;
@@ -27,7 +29,7 @@ const JAPANESE_STUDY_ASSISTANT_SYSTEM = `
 @Injectable()
 export class OllamaService {
   private readonly logger = new Logger(OllamaService.name);
-  private readonly baseUrl: string;
+  readonly baseUrl: string;
 
   constructor(private readonly config: ConfigService) {
     this.baseUrl =
@@ -37,58 +39,47 @@ export class OllamaService {
       ) || 'http://host.docker.internal:11434';
   }
 
-  private async post<T>(path: string, body?: object): Promise<T> {
-    this.logger.log(`[LLM Request] ${path} body=${JSON.stringify(body ?? {})}`);
+  private async post<T>(
+    path: string,
+    body: object | undefined,
+    requestId?: string,
+  ): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
-      this.logger.warn(`[LLM Error] ${res.status} ${res.statusText}`);
+      logWarn(this.logger, {
+        requestId,
+        event: 'llm.request.failed',
+        module: OllamaService.name,
+        status: 'failed',
+        httpStatus: res.status,
+        error: `${res.status} ${res.statusText}`,
+      });
       throw new Error(`Ollama request failed: ${res.status} ${res.statusText}`);
     }
     const data = (await res.json()) as T;
-    const dataObj = data as Record<string, unknown>;
-    if (dataObj?.response != null && typeof dataObj.response === 'string') {
-      const text = dataObj.response;
-      if (LLM_VERBOSE) {
-        this.logger.log(`[LLM Response] ${path} response=${text}`);
-      } else {
-        const preview =
-          text.length <= RESPONSE_PREVIEW_LEN
-            ? text
-            : text.slice(0, RESPONSE_PREVIEW_LEN) + '…';
-        this.logger.log(
-          `[LLM Response] ${path} length=${text.length} preview=${preview}`,
-        );
-      }
-    } else if (
-      dataObj?.message != null &&
-      typeof (dataObj.message as { content?: string }).content === 'string'
-    ) {
-      const text = (dataObj.message as { content: string }).content;
-      if (LLM_VERBOSE) {
-        this.logger.log(`[LLM Response] ${path} message.content=${text}`);
-      } else {
-        const preview =
-          text.length <= RESPONSE_PREVIEW_LEN
-            ? text
-            : text.slice(0, RESPONSE_PREVIEW_LEN) + '…';
-        this.logger.log(
-          `[LLM Response] ${path} length=${text.length} preview=${preview}`,
-        );
-      }
-    } else {
-      this.logger.log(
-        `[LLM Response] ${path} data=${JSON.stringify(data).slice(0, 300)}…`,
-      );
+    if (LLM_VERBOSE) {
+      logInfo(this.logger, {
+        requestId,
+        event: 'llm.request.completed',
+        module: OllamaService.name,
+        status: 'succeeded',
+        preview: JSON.stringify(data).slice(0, RESPONSE_PREVIEW_LEN),
+      });
     }
     return data;
   }
 
   private async withModelFallback<T>(
     requestedModel: string | undefined,
+    context: {
+      requestId?: string;
+      promptLength?: number;
+      messageCount?: number;
+    },
     runner: (model: string) => Promise<T>,
   ): Promise<T> {
     const primaryModel = requestedModel || DEFAULT_MODEL;
@@ -100,191 +91,361 @@ export class OllamaService {
         primaryModel === DEFAULT_MODEL &&
         primaryModel !== FALLBACK_MODEL;
       if (!shouldFallback) throw error;
-      const reason =
-        error instanceof Error ? error.message : 'unknown error';
-      this.logger.warn(
-        `[LLM Fallback] primary=${primaryModel} fallback=${FALLBACK_MODEL} reason=${reason}`,
-      );
-      return runner(FALLBACK_MODEL);
+      const reason = error instanceof Error ? error.message : 'unknown error';
+      logWarn(this.logger, {
+        requestId: context.requestId,
+        event: 'llm.request.fallback_started',
+        module: OllamaService.name,
+        status: 'started',
+        model: primaryModel,
+        fallbackModel: FALLBACK_MODEL,
+        promptLength: context.promptLength,
+        messageCount: context.messageCount,
+        error: reason,
+      });
+      const result = await runner(FALLBACK_MODEL);
+      logInfo(this.logger, {
+        requestId: context.requestId,
+        event: 'llm.request.fallback_completed',
+        module: OllamaService.name,
+        status: 'succeeded',
+        model: FALLBACK_MODEL,
+        fallbackModel: FALLBACK_MODEL,
+        promptLength: context.promptLength,
+        messageCount: context.messageCount,
+      });
+      return result;
     }
   }
 
-  /** Call Ollama /api/generate (single prompt, matches life-rpg). */
-  async generateRaw(prompt: string, model?: string): Promise<string> {
-    return this.withModelFallback(model, async (resolvedModel) => {
-      const result = await this.post<{ response: string }>('/api/generate', {
-        model: resolvedModel,
-        prompt,
-        stream: false,
-      });
-      return (result?.response ?? '').trim();
-    });
-  }
-
-  async chat(model: string, messages: OllamaChatMessage[]): Promise<string> {
-    const result = await this.post<{ message: { content: string } }>(
-      '/api/chat',
-      { model, messages, stream: false },
+  async generateRaw(
+    prompt: string,
+    model?: string,
+    context?: { requestId?: string; messageCount?: number },
+  ): Promise<string> {
+    return this.withModelFallback(
+      model,
+      {
+        requestId: context?.requestId,
+        promptLength: prompt.length,
+        messageCount: context?.messageCount,
+      },
+      async (resolvedModel) => {
+        const startedAt = Date.now();
+        logInfo(this.logger, {
+          requestId: context?.requestId,
+          event: 'llm.request.started',
+          module: OllamaService.name,
+          status: 'started',
+          model: resolvedModel,
+          promptLength: prompt.length,
+          messageCount: context?.messageCount,
+        });
+        try {
+          const result = await this.post<{ response: string }>(
+            '/api/generate',
+            {
+              model: resolvedModel,
+              prompt,
+              stream: false,
+            },
+            context?.requestId,
+          );
+          const response = (result?.response ?? '').trim();
+          logInfo(this.logger, {
+            requestId: context?.requestId,
+            event: 'llm.request.completed',
+            module: OllamaService.name,
+            status: 'succeeded',
+            model: resolvedModel,
+            durationMs: Date.now() - startedAt,
+            promptLength: prompt.length,
+            messageCount: context?.messageCount,
+            responseLength: response.length,
+          });
+          return response;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logError(this.logger, {
+            requestId: context?.requestId,
+            event: 'llm.request.failed',
+            module: OllamaService.name,
+            status: 'failed',
+            model: resolvedModel,
+            durationMs: Date.now() - startedAt,
+            promptLength: prompt.length,
+            messageCount: context?.messageCount,
+            error: message,
+          });
+          throw error;
+        }
+      },
     );
-    return result.message?.content ?? '';
   }
 
   async generate(
     model: string,
     prompt: string,
     system?: string,
+    context?: { requestId?: string; messageCount?: number },
   ): Promise<string> {
     const messages: OllamaChatMessage[] = [];
     if (system) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: prompt });
-    return this.chat(model, messages);
+    const startedAt = Date.now();
+    logInfo(this.logger, {
+      requestId: context?.requestId,
+      event: 'llm.request.started',
+      module: OllamaService.name,
+      status: 'started',
+      model,
+      promptLength: prompt.length,
+      messageCount: messages.length,
+    });
+    try {
+      const result = await this.post<{ message: { content: string } }>(
+        '/api/chat',
+        { model, messages, stream: false },
+        context?.requestId,
+      );
+      const response = result.message?.content ?? '';
+      logInfo(this.logger, {
+        requestId: context?.requestId,
+        event: 'llm.request.completed',
+        module: OllamaService.name,
+        status: 'succeeded',
+        model,
+        durationMs: Date.now() - startedAt,
+        promptLength: prompt.length,
+        messageCount: messages.length,
+        responseLength: response.length,
+      });
+      return response;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(this.logger, {
+        requestId: context?.requestId,
+        event: 'llm.request.failed',
+        module: OllamaService.name,
+        status: 'failed',
+        model,
+        durationMs: Date.now() - startedAt,
+        promptLength: prompt.length,
+        messageCount: messages.length,
+        error: message,
+      });
+      throw error;
+    }
   }
 
-  /** 한국어 설명 중심으로 생성하되, 일본어 학습 예시는 원문 유지 */
-  async generateInKoreanOnly(prompt: string, model?: string): Promise<string> {
-    return this.withModelFallback(model, (resolvedModel) =>
-      this.generate(resolvedModel, prompt, JAPANESE_STUDY_ASSISTANT_SYSTEM),
+  async generateInKoreanOnly(
+    prompt: string,
+    model?: string,
+    context?: { requestId?: string; messageCount?: number },
+  ): Promise<string> {
+    return this.withModelFallback(
+      model,
+      {
+        requestId: context?.requestId,
+        promptLength: prompt.length,
+        messageCount: context?.messageCount,
+      },
+      (resolvedModel) =>
+        this.generate(resolvedModel, prompt, JAPANESE_STUDY_ASSISTANT_SYSTEM, context),
     );
   }
 
-  /** 활동 로그를 분석해 요약/인사이트 생성 (life-rpg ai/client.rs analyze_activity 이식) */
-  async analyzeActivity(
-    activityContent: string,
-    model?: string,
-  ): Promise<string> {
-    const prompt = `다음은 사용자의 활동 로그입니다. 이 활동의 핵심 내용과 인사이트를 2~3문장으로 간단히 정리해 주세요.
+  private async *parseNdjsonStream(
+    res: globalThis.Response,
+  ): AsyncGenerator<string> {
+    if (!res.body) throw new Error('No response body');
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-활동 로그:
-${activityContent}
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-요약/인사이트:`;
-    return this.generateInKoreanOnly(prompt, model);
-  }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
 
-  /** 콘텐츠 요약 (life-rpg ai/prompt.rs build_summary_prompt 이식) - 한국어 한 문장 80자 이내 */
-  async summarizeContent(content: string, model?: string): Promise<string> {
-    const prompt = `다음 활동 내용을 한국어 한 문장(80자 이내)으로 짧게 요약해 주세요. 따옴표나 접두어 없이 요약 문장만 출력하세요.
-
-활동 내용: ${content}
-요약:`;
-    return this.generateInKoreanOnly(prompt, model);
-  }
-
-  /** 능력별 XP 분석 (life-rpg ai/client.rs analyze_activity) - JSON { "능력명": XP숫자 } 반환 */
-  async analyzeActivityXp(
-    content: string,
-    abilityNames: string[],
-    model?: string,
-  ): Promise<Record<string, number>> {
-    if (abilityNames.length === 0) return {};
-    const rule = tryRuleBased(content);
-    if (rule) {
-      return filterToAbilities(rule, abilityNames);
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line) as {
+            message?: { content: string };
+            done?: boolean;
+          };
+          if (parsed.message?.content) {
+            yield parsed.message.content;
+          }
+          if (parsed.done) return;
+        } catch {
+          // 파싱 실패 무시
+        }
+      }
     }
-    const keys = abilityNames.map((s) => `"${s}"`).join(', ');
-    const example = abilityNames
-      .map((s, i) => `"${s}": ${(i + 1) % 4}`)
-      .join(', ');
-    const prompt = `다음 활동 내용을 읽고 각 능력치별로 경험치(XP)를 0~30 사이의 정수로 배분해 주세요.
+  }
 
-활동 내용: ${content}
-
-반환 형식: 아래 능력 이름들을 키로 가지는 JSON 객체만 반환하세요. 값은 0~30 사이의 정수입니다.
-키 목록: ${keys}
-예시: {${example}}
-
-JSON 이외의 다른 설명이나 텍스트는 절대 포함하지 마세요.`;
-    const text = await this.generateRaw(prompt, model);
-    const jsonStr = text
-      .trim()
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
-    let parsed: Record<string, unknown>;
+  async *streamChat(
+    messages: OllamaChatMessage[],
+    model?: string,
+    context?: { requestId?: string; messageCount?: number },
+  ): AsyncGenerator<string> {
+    const resolvedModel = model || DEFAULT_MODEL;
+    const startedAt = Date.now();
+    logInfo(this.logger, {
+      requestId: context?.requestId,
+      event: 'llm.stream.started',
+      module: OllamaService.name,
+      status: 'started',
+      model: resolvedModel,
+      messageCount: context?.messageCount ?? messages.length,
+    });
     try {
-      parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-    } catch {
-      return filterToAbilities({}, abilityNames);
+      const res = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: resolvedModel,
+          messages: [
+            { role: 'system', content: JAPANESE_STUDY_ASSISTANT_SYSTEM },
+            ...messages,
+          ],
+          stream: true,
+        }),
+      });
+      if (!res.ok) {
+        logWarn(this.logger, {
+          requestId: context?.requestId,
+          event: 'llm.stream.failed',
+          module: OllamaService.name,
+          status: 'failed',
+          model: resolvedModel,
+          httpStatus: res.status,
+          messageCount: context?.messageCount ?? messages.length,
+          error: `Ollama stream failed: ${res.status}`,
+        });
+        throw new Error(`Ollama stream failed: ${res.status}`);
+      }
+      yield* this.parseNdjsonStream(res);
+      logInfo(this.logger, {
+        requestId: context?.requestId,
+        event: 'llm.stream.completed',
+        module: OllamaService.name,
+        status: 'succeeded',
+        model: resolvedModel,
+        durationMs: Date.now() - startedAt,
+        messageCount: context?.messageCount ?? messages.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(this.logger, {
+        requestId: context?.requestId,
+        event: 'llm.stream.failed',
+        module: OllamaService.name,
+        status: 'failed',
+        model: resolvedModel,
+        durationMs: Date.now() - startedAt,
+        messageCount: context?.messageCount ?? messages.length,
+        error: message,
+      });
+      throw error;
     }
-    const result: Record<string, number> = {};
-    for (const name of abilityNames) {
-      const v = parsed[name];
-      result[name] = typeof v === 'number' ? v : 0;
+  }
+
+  async *streamChatWithImage(
+    question: string,
+    imageBase64: string,
+    context?: { requestId?: string; messageCount?: number },
+  ): AsyncGenerator<string> {
+    const startedAt = Date.now();
+    logInfo(this.logger, {
+      requestId: context?.requestId,
+      event: 'llm.image_stream.started',
+      module: OllamaService.name,
+      status: 'started',
+      model: IMAGE_MODEL,
+      promptLength: question.length,
+      messageCount: context?.messageCount ?? 1,
+    });
+    try {
+      const res = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: IMAGE_MODEL,
+          messages: [
+            { role: 'system', content: JAPANESE_STUDY_ASSISTANT_SYSTEM },
+            {
+              role: 'user',
+              content: question || '이 이미지의 일본어 텍스트를 분석해주세요.',
+              images: [imageBase64],
+            },
+          ],
+          stream: true,
+        }),
+      });
+      if (!res.ok) {
+        logWarn(this.logger, {
+          requestId: context?.requestId,
+          event: 'llm.image_stream.failed',
+          module: OllamaService.name,
+          status: 'failed',
+          model: IMAGE_MODEL,
+          httpStatus: res.status,
+          messageCount: context?.messageCount ?? 1,
+          error: `Ollama image stream failed: ${res.status}`,
+        });
+        throw new Error(`Ollama image stream failed: ${res.status}`);
+      }
+      yield* this.parseNdjsonStream(res);
+      logInfo(this.logger, {
+        requestId: context?.requestId,
+        event: 'llm.image_stream.completed',
+        module: OllamaService.name,
+        status: 'succeeded',
+        model: IMAGE_MODEL,
+        durationMs: Date.now() - startedAt,
+        promptLength: question.length,
+        messageCount: context?.messageCount ?? 1,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logError(this.logger, {
+        requestId: context?.requestId,
+        event: 'llm.image_stream.failed',
+        module: OllamaService.name,
+        status: 'failed',
+        model: IMAGE_MODEL,
+        durationMs: Date.now() - startedAt,
+        promptLength: question.length,
+        messageCount: context?.messageCount ?? 1,
+        error: message,
+      });
+      throw error;
     }
-    return result;
-  }
-
-  // --- 프롬프트 빌더 (PromptBuilder 위임) ---
-
-  buildDailyAnalysisPrompt(activitiesText: string): string {
-    return PromptBuilder.buildDailyAnalysis(activitiesText);
-  }
-
-  buildGoalAnalysisPrompt(
-    goalName: string,
-    targetAbility: string,
-    previousContext: string,
-    activitiesText: string,
-  ): string {
-    return PromptBuilder.buildGoalAnalysis(goalName, targetAbility, previousContext, activitiesText);
-  }
-
-  buildGoalAnalysisPromptFromTemplate(
-    template: string,
-    goalName: string,
-    targetAbility: string,
-    previousContext: string,
-    activitiesText: string,
-  ): string {
-    return PromptBuilder.buildGoalAnalysisFromTemplate(template, goalName, targetAbility, previousContext, activitiesText);
-  }
-
-  buildGoalAnalysisPromptFixed(
-    goalName: string,
-    targetAbility: string,
-    previousContext: string,
-    activitiesText: string,
-    userInstruction: string | null,
-  ): string {
-    return PromptBuilder.buildGoalAnalysisFixed(goalName, targetAbility, previousContext, activitiesText, userInstruction);
   }
 
   buildJapaneseWordExplanationPrompt(term: string): string {
     return PromptBuilder.buildJapaneseWordExplanation(term);
   }
 
-  buildJapaneseGrammarExplanationPrompt(
-    grammar: string,
-    learnerSentence?: string,
-  ): string {
-    return PromptBuilder.buildJapaneseGrammarExplanation(
-      grammar,
-      learnerSentence,
-    );
+  buildJapaneseGrammarExplanationPrompt(grammar: string, learnerSentence?: string): string {
+    return PromptBuilder.buildJapaneseGrammarExplanation(grammar, learnerSentence);
   }
 
-  buildJapaneseExampleGenerationPrompt(
-    expression: string,
-    level?: string,
-  ): string {
+  buildJapaneseExampleGenerationPrompt(expression: string, level?: string): string {
     return PromptBuilder.buildJapaneseExampleGeneration(expression, level);
   }
 
-  buildJapaneseCorrectionPrompt(
-    learnerSentence: string,
-    intendedMeaning?: string,
-  ): string {
-    return PromptBuilder.buildJapaneseCorrection(
-      learnerSentence,
-      intendedMeaning,
-    );
+  buildJapaneseCorrectionPrompt(learnerSentence: string, intendedMeaning?: string): string {
+    return PromptBuilder.buildJapaneseCorrection(learnerSentence, intendedMeaning);
   }
 
-  buildJapaneseRoleplayPrompt(
-    situation: string,
-    learnerLevel?: string,
-  ): string {
+  buildJapaneseRoleplayPrompt(situation: string, learnerLevel?: string): string {
     return PromptBuilder.buildJapaneseRoleplay(situation, learnerLevel);
   }
 }
