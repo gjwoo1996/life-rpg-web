@@ -11,6 +11,8 @@ services:
       # Common_Repo stack on external network gw-shared-devnet (postgres, ollama)
       - OLLAMA_HOST=http://ollama:11434
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      - LIFERPG_LLM_MODEL_DEFAULT=qwen3:8b
+      - LIFERPG_LLM_MODEL_FALLBACK=qwen2.5:7b
       - TZ=Asia/Seoul
     volumes:
       - ..:${containerWorkspaceFolder}:cached
