@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { api, type ChatMessageDto, type JlptAnalysisDto } from "@/lib/api";
+import {
+  api,
+  type ChatMessageDto,
+  type ChatModelDto,
+  type JlptAnalysisDto,
+} from "@/lib/api";
 import { streamChatResponse, streamImageResponse } from "@/lib/sse";
 import { AppHeader } from "@/components/AppHeader";
 import { ChatBubble, StreamingBubble } from "@/components/ChatBubble";
@@ -13,14 +18,20 @@ export default function Home() {
   const [streaming, setStreaming] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [jlptData, setJlptData] = useState<JlptAnalysisDto | null>(null);
+  const [models, setModels] = useState<ChatModelDto[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>();
   const [loadError, setLoadError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    Promise.all([api.chat.getHistory(), api.jlpt.getLatest()])
-      .then(([history, jlpt]) => {
+    Promise.all([api.chat.getHistory(), api.jlpt.getLatest(), api.chat.getModels()])
+      .then(([history, jlpt, modelOptions]) => {
         setMessages(history);
         setJlptData(jlpt);
+        setModels(modelOptions);
+        setSelectedModel(
+          modelOptions.find((model) => model.isDefault)?.id ?? modelOptions[0]?.id,
+        );
       })
       .catch((e) =>
         setLoadError(e instanceof Error ? e.message : "API 연결 실패")
@@ -31,7 +42,7 @@ export default function Home() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
 
-  const handleSend = useCallback((message: string) => {
+  const handleSend = useCallback((message: string, model: string | undefined) => {
     if (isStreaming) return;
     setIsStreaming(true);
     setStreaming("");
@@ -48,6 +59,7 @@ export default function Home() {
     let accumulated = "";
     streamChatResponse(
       message,
+      model,
       (chunk) => {
         accumulated += chunk;
         setStreaming(accumulated);
@@ -158,6 +170,9 @@ export default function Home() {
           <ChatInput
             onSend={handleSend}
             onSendImage={handleSendImage}
+            models={models}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
             disabled={isStreaming}
           />
         </main>

@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as express from 'express';
 import { ChatMessage } from '../entities/chat-message.entity';
-import { OllamaService, OllamaChatMessage } from '../ollama/ollama.service';
+import {
+  OllamaService,
+  OllamaChatMessage,
+  OllamaModelOption,
+} from '../ollama/ollama.service';
 import { JlptService } from '../jlpt/jlpt.service';
 import { logError, logInfo, logWarn } from '../logging/structured-logger';
 
@@ -27,6 +31,7 @@ export class ChatService {
 
   async streamResponse(
     message: string,
+    model: string | undefined,
     res: express.Response,
     context: ChatRequestLogContext,
   ): Promise<void> {
@@ -77,7 +82,7 @@ export class ChatService {
     });
 
     try {
-      for await (const chunk of this.ollama.streamChat(ollamaMessages, undefined, {
+      for await (const chunk of this.ollama.streamChat(ollamaMessages, model, {
         requestId: context.requestId,
         messageCount: ollamaMessages.length,
       })) {
@@ -278,6 +283,10 @@ export class ChatService {
       order: { createdAt: 'ASC' },
       take: limit,
     });
+  }
+
+  getAvailableModels(): Promise<OllamaModelOption[]> {
+    return this.ollama.getAvailableChatModels();
   }
 
   async clearHistory(): Promise<{ ok: boolean }> {

@@ -50,7 +50,7 @@ export class ChatController {
     res.flushHeaders();
 
     try {
-      await this.chatService.streamResponse(dto.message, res, {
+      await this.chatService.streamResponse(dto.message, dto.model, res, {
         requestId: req.requestId,
         method: req.method,
         path: req.path,
@@ -160,6 +160,11 @@ export class ChatController {
   @Get('history')
   getHistory(@Query('limit') limit?: string) {
     return this.chatService.getHistory(limit ? parseInt(limit, 10) : 100);
+  }
+
+  @Get('models')
+  getModels() {
+    return this.chatService.getAvailableModels();
   }
 
   @Delete('history')

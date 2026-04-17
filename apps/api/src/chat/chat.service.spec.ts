@@ -45,14 +45,14 @@ describe('ChatService', () => {
       statusCode: 200,
     } as unknown as express.Response;
 
-    await service.streamResponse('메시지', res, {
+    await service.streamResponse('메시지', 'gemma3:4b', res, {
       requestId: 'req-1',
       method: 'POST',
       path: '/chat',
     });
 
     expect(save).toHaveBeenCalledTimes(2);
-    expect(ollama.streamChat).toHaveBeenCalledWith(expect.any(Array), undefined, {
+    expect(ollama.streamChat).toHaveBeenCalledWith(expect.any(Array), 'gemma3:4b', {
       requestId: 'req-1',
       messageCount: 2,
     });
@@ -97,12 +97,28 @@ describe('ChatService', () => {
       statusCode: 200,
     } as unknown as express.Response;
 
-    await service.streamResponse('메시지', res, { requestId: 'req-2' });
+    await service.streamResponse('메시지', undefined, res, { requestId: 'req-2' });
 
     expect(res.write).toHaveBeenCalledWith(
       expect.stringContaining('"error":"stream broke"'),
     );
     const events = errorSpy.mock.calls.map(([message]) => JSON.parse(String(message)).event);
     expect(events).toContain('chat.stream.failed');
+  });
+
+  it('returns available model options from ollama', async () => {
+    const chatRepo = {} as Repository<ChatMessage>;
+    const ollama = {
+      getAvailableChatModels: jest.fn().mockResolvedValue([
+        { id: 'qwen3:8b', label: 'qwen3:8b', isDefault: true },
+      ]),
+    } as unknown as OllamaService;
+    const jlptService = {} as JlptService;
+
+    const service = new ChatService(chatRepo, ollama, jlptService);
+
+    await expect(service.getAvailableModels()).resolves.toEqual([
+      { id: 'qwen3:8b', label: 'qwen3:8b', isDefault: true },
+    ]);
   });
 });

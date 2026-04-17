@@ -121,6 +121,7 @@ async function consumeSseStream(
 
 export async function streamChatResponse(
   message: string,
+  model: string | undefined,
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (err: Error) => void,
@@ -129,7 +130,7 @@ export async function streamChatResponse(
     const res = await fetch(`${API_BASE}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, model }),
     });
     if (!res.ok) throw new Error(`API ${res.status}`);
     await consumeSseStream(res, onChunk, onDone);

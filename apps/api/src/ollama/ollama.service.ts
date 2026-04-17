@@ -26,6 +26,12 @@ const JAPANESE_STUDY_ASSISTANT_SYSTEM = `
 4. 불필요한 장문 서론은 쓰지 말고 바로 본문으로 답합니다.
 `.trim();
 
+export interface OllamaModelOption {
+  id: string;
+  label: string;
+  isDefault: boolean;
+}
+
 @Injectable()
 export class OllamaService {
   private readonly logger = new Logger(OllamaService.name);
@@ -71,6 +77,55 @@ export class OllamaService {
       });
     }
     return data;
+  }
+
+  private getFallbackModelOptions(): OllamaModelOption[] {
+    return Array.from(new Set([DEFAULT_MODEL, FALLBACK_MODEL]))
+      .map((model) => ({
+        id: model,
+        label: model,
+        isDefault: model === DEFAULT_MODEL,
+      }));
+  }
+
+  async getAvailableChatModels(): Promise<OllamaModelOption[]> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/tags`);
+      if (!res.ok) {
+        throw new Error(`Ollama tags failed: ${res.status} ${res.statusText}`);
+      }
+
+      const data = (await res.json()) as {
+        models?: Array<{ model?: string; name?: string }>;
+      };
+
+      const models = (data.models ?? [])
+        .map((entry) => entry.model ?? entry.name ?? '')
+        .filter((model) => model);
+
+      if (models.length === 0) {
+        return this.getFallbackModelOptions();
+      }
+
+      const deduped = Array.from(
+        new Set([DEFAULT_MODEL, FALLBACK_MODEL, ...models]),
+      );
+
+      return deduped.map((model) => ({
+        id: model,
+        label: model,
+        isDefault: model === DEFAULT_MODEL,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logWarn(this.logger, {
+        event: 'llm.models.fetch_failed',
+        module: OllamaService.name,
+        status: 'failed',
+        error: message,
+      });
+      return this.getFallbackModelOptions();
+    }
   }
 
   private async withModelFallback<T>(

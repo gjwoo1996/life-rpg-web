@@ -1,14 +1,25 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import type { ChatModelDto } from "@/lib/api";
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, model: string | undefined) => void;
   onSendImage: (question: string, file: File) => void;
+  models: ChatModelDto[];
+  selectedModel?: string;
+  onModelChange: (model: string) => void;
   disabled?: boolean;
 }
 
-export function ChatInput({ onSend, onSendImage, disabled }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  onSendImage,
+  models,
+  selectedModel,
+  onModelChange,
+  disabled,
+}: ChatInputProps) {
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -21,7 +32,7 @@ export function ChatInput({ onSend, onSendImage, disabled }: ChatInputProps) {
       onSendImage(trimmed, selectedFile);
       setSelectedFile(null);
     } else {
-      onSend(trimmed);
+      onSend(trimmed, selectedModel);
     }
     setText("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -60,6 +71,34 @@ export function ChatInput({ onSend, onSendImage, disabled }: ChatInputProps) {
 
   return (
     <div className="border-t border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="model-select"
+            className="text-xs font-medium text-zinc-500 dark:text-zinc-400"
+          >
+            LLM 모델
+          </label>
+          <select
+            id="model-select"
+            value={selectedModel ?? ""}
+            onChange={(e) => onModelChange(e.target.value)}
+            disabled={disabled || models.length === 0 || !!selectedFile}
+            className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-40"
+          >
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.label}{model.isDefault ? " (기본)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        {selectedFile && (
+          <p className="text-[11px] text-zinc-400">
+            이미지 분석은 선택값과 관계없이 `llava:7b`로 처리됩니다.
+          </p>
+        )}
+      </div>
       {selectedFile && (
         <div className="flex items-center gap-2 mb-2 px-1">
           <span className="text-xs text-zinc-500 truncate max-w-[200px]">

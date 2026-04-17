@@ -43,10 +43,17 @@ export type JlptAnalysisDto = {
   analyzedAt: string;
 };
 
+export type ChatModelDto = {
+  id: string;
+  label: string;
+  isDefault: boolean;
+};
+
 export const API_BASE_URL = API_BASE;
 
 export const api = {
   chat: {
+    getModels: () => request<ChatModelDto[]>("/chat/models"),
     getHistory: (limit?: number) =>
       request<ChatMessageDto[]>(
         limit ? `/chat/history?limit=${limit}` : "/chat/history"
