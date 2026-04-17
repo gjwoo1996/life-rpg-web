@@ -8,13 +8,21 @@ export interface OllamaChatMessage {
   content: string;
 }
 
-const DEFAULT_MODEL = process.env.LIFERPG_LLM_MODEL_DEFAULT || 'qwen2.5:7b';
+const DEFAULT_MODEL = process.env.LIFERPG_LLM_MODEL_DEFAULT || 'qwen3:8b';
+const FALLBACK_MODEL =
+  process.env.LIFERPG_LLM_MODEL_FALLBACK || 'qwen2.5:7b';
 
 const LLM_VERBOSE = process.env.LIFERPG_LLM_VERBOSE === 'true';
 const RESPONSE_PREVIEW_LEN = 200;
 
-const KOREAN_ONLY_SYSTEM =
-  '반드시 한국어로만 답변해야 합니다. 영어, 일본어, 중국어 등 다른 언어를 사용하지 마세요. 출력 내용은 모두 한국어여야 하며, 다른 언어를 섞어 쓰지 마세요.';
+const JAPANESE_STUDY_ASSISTANT_SYSTEM = `
+당신은 일본어 공부를 돕는 학습 어시스트입니다.
+기본 원칙:
+1. 설명, 피드백, 비교는 한국어로 명확하게 작성합니다.
+2. 일본어 단어, 예문, 문법 형태, 활용형은 일본어 원문 그대로 제시합니다.
+3. 사용자가 JSON 또는 고정 섹션 형식을 요구하면 반드시 그대로 따릅니다.
+4. 불필요한 장문 서론은 쓰지 말고 바로 본문으로 답합니다.
+`.trim();
 
 @Injectable()
 export class OllamaService {
@@ -79,15 +87,38 @@ export class OllamaService {
     return data;
   }
 
+  private async withModelFallback<T>(
+    requestedModel: string | undefined,
+    runner: (model: string) => Promise<T>,
+  ): Promise<T> {
+    const primaryModel = requestedModel || DEFAULT_MODEL;
+    try {
+      return await runner(primaryModel);
+    } catch (error) {
+      const shouldFallback =
+        !requestedModel &&
+        primaryModel === DEFAULT_MODEL &&
+        primaryModel !== FALLBACK_MODEL;
+      if (!shouldFallback) throw error;
+      const reason =
+        error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(
+        `[LLM Fallback] primary=${primaryModel} fallback=${FALLBACK_MODEL} reason=${reason}`,
+      );
+      return runner(FALLBACK_MODEL);
+    }
+  }
+
   /** Call Ollama /api/generate (single prompt, matches life-rpg). */
   async generateRaw(prompt: string, model?: string): Promise<string> {
-    const m = model || DEFAULT_MODEL;
-    const result = await this.post<{ response: string }>('/api/generate', {
-      model: m,
-      prompt,
-      stream: false,
+    return this.withModelFallback(model, async (resolvedModel) => {
+      const result = await this.post<{ response: string }>('/api/generate', {
+        model: resolvedModel,
+        prompt,
+        stream: false,
+      });
+      return (result?.response ?? '').trim();
     });
-    return (result?.response ?? '').trim();
   }
 
   async chat(model: string, messages: OllamaChatMessage[]): Promise<string> {
@@ -109,16 +140,17 @@ export class OllamaService {
     return this.chat(model, messages);
   }
 
-  /** 한국어 전용 출력으로 생성 (system 메시지로 언어 강제) */
+  /** 한국어 설명 중심으로 생성하되, 일본어 학습 예시는 원문 유지 */
   async generateInKoreanOnly(prompt: string, model?: string): Promise<string> {
-    const m = model || DEFAULT_MODEL;
-    return this.generate(m, prompt, KOREAN_ONLY_SYSTEM);
+    return this.withModelFallback(model, (resolvedModel) =>
+      this.generate(resolvedModel, prompt, JAPANESE_STUDY_ASSISTANT_SYSTEM),
+    );
   }
 
   /** 활동 로그를 분석해 요약/인사이트 생성 (life-rpg ai/client.rs analyze_activity 이식) */
   async analyzeActivity(
     activityContent: string,
-    model = 'llama3.2',
+    model?: string,
   ): Promise<string> {
     const prompt = `다음은 사용자의 활동 로그입니다. 이 활동의 핵심 내용과 인사이트를 2~3문장으로 간단히 정리해 주세요.
 
@@ -126,7 +158,7 @@ export class OllamaService {
 ${activityContent}
 
 요약/인사이트:`;
-    return this.generate(model, prompt, KOREAN_ONLY_SYSTEM);
+    return this.generateInKoreanOnly(prompt, model);
   }
 
   /** 콘텐츠 요약 (life-rpg ai/prompt.rs build_summary_prompt 이식) - 한국어 한 문장 80자 이내 */
@@ -216,5 +248,43 @@ JSON 이외의 다른 설명이나 텍스트는 절대 포함하지 마세요.`;
     userInstruction: string | null,
   ): string {
     return PromptBuilder.buildGoalAnalysisFixed(goalName, targetAbility, previousContext, activitiesText, userInstruction);
+  }
+
+  buildJapaneseWordExplanationPrompt(term: string): string {
+    return PromptBuilder.buildJapaneseWordExplanation(term);
+  }
+
+  buildJapaneseGrammarExplanationPrompt(
+    grammar: string,
+    learnerSentence?: string,
+  ): string {
+    return PromptBuilder.buildJapaneseGrammarExplanation(
+      grammar,
+      learnerSentence,
+    );
+  }
+
+  buildJapaneseExampleGenerationPrompt(
+    expression: string,
+    level?: string,
+  ): string {
+    return PromptBuilder.buildJapaneseExampleGeneration(expression, level);
+  }
+
+  buildJapaneseCorrectionPrompt(
+    learnerSentence: string,
+    intendedMeaning?: string,
+  ): string {
+    return PromptBuilder.buildJapaneseCorrection(
+      learnerSentence,
+      intendedMeaning,
+    );
+  }
+
+  buildJapaneseRoleplayPrompt(
+    situation: string,
+    learnerLevel?: string,
+  ): string {
+    return PromptBuilder.buildJapaneseRoleplay(situation, learnerLevel);
   }
 }
