@@ -1,8 +1,3 @@
-/**
- * NestJS API 클라이언트 (life-rpg invoke() → HTTP 호출 대체)
- * NEXT_PUBLIC_API_URL 환경 변수 사용 (기본: http://localhost:3001)
- */
-
 const API_BASE =
   typeof window !== "undefined"
     ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001")
@@ -23,231 +18,45 @@ async function request<T>(
     const text = await res.text();
     throw new Error(`API ${res.status}: ${text}`);
   }
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  if (!text) return null as T;
+  return JSON.parse(text) as T;
 }
 
-export type CharacterDto = {
+export type ChatMessageDto = {
   id: string;
-  name: string;
-  level?: number;
-  xp?: number;
-  activityCalendarColor?: string | null;
-  createdAt: string;
-};
-
-export type GoalDto = {
-  id: string;
-  characterId: string;
-  title: string;
-  description?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
-  targetSkill?: string | null;
-  calendarColor?: string;
-  goalAnalysisPromptTemplate?: string | null;
-  goalAnalysisUserInstruction?: string | null;
-  createdAt: string;
-  steps?: GoalStepDto[];
-};
-
-export type GoalStepDto = {
-  id: string;
-  goalId: string;
-  title: string;
-  description?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
-  order: number;
-  completed: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ActivityLogDto = {
-  id: string;
-  characterId: string;
-  date?: string | null;
+  role: "user" | "assistant";
   content: string;
-  summary?: string | null;
-  aiResult?: string | null;
-  xpGained?: number;
+  hasImage: boolean;
   createdAt: string;
 };
 
-export type AbilityStatDto = { abilityId: string; name: string; xp: number };
-
-export type ActivityCreateResultDto = ActivityLogDto & {
-  abilityXpChanges: { name: string; xp: number }[];
-  ollamaFailed: boolean;
-};
-
-export type GoalAnalysisDto = {
+export type JlptAnalysisDto = {
   id: string;
-  goalId: string;
-  content: string;
-  lastAnalyzedAt?: string | null;
-  createdAt: string;
+  level: "N1" | "N2" | "N3" | "N4" | "N5";
+  vocabularyScore: number;
+  grammarScore: number;
+  readingScore: number;
+  totalScore: number;
+  messageCount: number;
+  analysisDetail: string | null;
+  analyzedAt: string;
 };
+
+export const API_BASE_URL = API_BASE;
 
 export const api = {
-  character: {
-    list: () => request<CharacterDto[]>("/character"),
-    get: (id: string) => request<CharacterDto>(`/character/${id}`),
-    create: (data: { name: string }) =>
-      request<CharacterDto>("/character", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    update: (id: string, data: { name?: string; level?: number; xp?: number; activityCalendarColor?: string | null }) =>
-      request<CharacterDto>(`/character/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) =>
-      request(`/character/${id}`, { method: "DELETE" }),
-  },
-
-  goal: {
-    list: (characterId?: string) =>
-      request<GoalDto[]>(
-        characterId ? `/goal?characterId=${characterId}` : "/goal"
+  chat: {
+    getHistory: (limit?: number) =>
+      request<ChatMessageDto[]>(
+        limit ? `/chat/history?limit=${limit}` : "/chat/history"
       ),
-    get: (id: string) => request<GoalDto>(`/goal/${id}`),
-    create: (data: {
-      characterId: string;
-      title: string;
-      description?: string;
-      startDate: string;
-      endDate: string;
-      targetSkill: string;
-      calendarColor?: string;
-    }) =>
-      request<GoalDto>("/goal", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: string, data: {
-      title?: string;
-      description?: string;
-      startDate?: string;
-      endDate?: string;
-      targetSkill?: string;
-      calendarColor?: string;
-      goalAnalysisPromptTemplate?: string | null;
-      goalAnalysisUserInstruction?: string | null;
-    }) =>
-      request(`/goal/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) => request(`/goal/${id}`, { method: "DELETE" }),
+    clearHistory: () =>
+      request<{ ok: boolean }>("/chat/history", { method: "DELETE" }),
   },
-
-  goalStep: {
-    list: (goalId: string) =>
-      request<GoalStepDto[]>(`/goal-step?goalId=${encodeURIComponent(goalId)}`),
-    create: (data: {
-      goalId: string;
-      title: string;
-      description?: string;
-      startDate?: string;
-      endDate?: string;
-      order?: number;
-    }) =>
-      request<GoalStepDto>("/goal-step", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    update: (
-      id: string,
-      data: {
-        title?: string;
-        description?: string | null;
-        startDate?: string | null;
-        endDate?: string | null;
-        order?: number;
-        completed?: boolean;
-      }
-    ) =>
-      request<GoalStepDto>(`/goal-step/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) =>
-      request(`/goal-step/${id}`, { method: "DELETE" }),
+  jlpt: {
+    getLatest: () => request<JlptAnalysisDto | null>("/jlpt"),
+    analyze: () =>
+      request<JlptAnalysisDto>("/jlpt/analyze", { method: "POST" }),
   },
-
-  activity: {
-    list: (
-      characterId?: string,
-      fromDate?: string,
-      toDate?: string
-    ) => {
-      const params = new URLSearchParams();
-      if (characterId) params.set("characterId", characterId);
-      if (fromDate) params.set("fromDate", fromDate);
-      if (toDate) params.set("toDate", toDate);
-      const q = params.toString();
-      return request<ActivityLogDto[]>(
-        q ? `/activity?${q}` : "/activity"
-      );
-    },
-    get: (id: string) => request<ActivityLogDto>(`/activity/${id}`),
-    create: (data: {
-      characterId: string;
-      date: string;
-      content: string;
-    }) =>
-      request<ActivityCreateResultDto>("/activity", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) => request(`/activity/${id}`, { method: "DELETE" }),
-  },
-
-  ability: {
-    list: (characterId?: string) =>
-      request(
-        characterId ? `/ability?characterId=${characterId}` : "/ability"
-      ),
-    getStats: (characterId: string) =>
-      request<AbilityStatDto[]>(
-        `/ability/stats?characterId=${encodeURIComponent(characterId)}`
-      ),
-    get: (id: string) => request(`/ability/${id}`),
-    create: (data: { characterId: string; name: string }) =>
-      request("/ability", { method: "POST", body: JSON.stringify(data) }),
-    addStat: (data: { characterId: string; abilityId: string; xp: number }) =>
-      request("/ability/stats", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    update: (id: string, data: { name?: string }) =>
-      request(`/ability/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) => request(`/ability/${id}`, { method: "DELETE" }),
-  },
-
-  analysis: {
-    getDaily: (characterId: string, date: string) =>
-      request(
-        `/analysis/daily?characterId=${encodeURIComponent(characterId)}&date=${encodeURIComponent(date)}`
-      ),
-    getGoal: (goalId: string) =>
-      request<GoalAnalysisDto[]>(`/analysis/goal/${goalId}`),
-    getGoalsBatch: (characterId: string) =>
-      request<Record<string, string | null>>(
-        `/analysis/goals?characterId=${encodeURIComponent(characterId)}`
-      ),
-    generateDaily: (characterId: string, date: string) =>
-      request("/analysis/daily/generate", {
-        method: "POST",
-        body: JSON.stringify({ characterId, date }),
-      }),
-    generateGoal: (goalId: string) =>
-      request(`/analysis/goal/${goalId}/generate`, { method: "POST" }),
-  },
-
-  reset: () =>
-    request<{ ok: boolean; message: string }>("/reset", { method: "POST" }),
 };

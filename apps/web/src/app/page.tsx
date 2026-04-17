@@ -1,83 +1,170 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, type CharacterDto } from "@/lib/api";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { api, type ChatMessageDto, type JlptAnalysisDto } from "@/lib/api";
+import { streamChatResponse, streamImageResponse } from "@/lib/sse";
 import { AppHeader } from "@/components/AppHeader";
-import { CharacterSetup } from "@/components/CharacterSetup";
+import { ChatBubble, StreamingBubble } from "@/components/ChatBubble";
+import { ChatInput } from "@/components/ChatInput";
+import { JlptSidebar } from "@/components/JlptSidebar";
 
 export default function Home() {
-  const router = useRouter();
-  const [list, setList] = useState<CharacterDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessageDto[]>([]);
+  const [streaming, setStreaming] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [jlptData, setJlptData] = useState<JlptAnalysisDto | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.character
-      .list()
-      .then((characters) => {
-        setList(characters);
-        if (characters.length === 1) {
-          router.replace(`/characters/${characters[0].id}`);
-        }
+    Promise.all([api.chat.getHistory(), api.jlpt.getLatest()])
+      .then(([history, jlpt]) => {
+        setMessages(history);
+        setJlptData(jlpt);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false));
-  }, [router]);
+      .catch((e) =>
+        setLoadError(e instanceof Error ? e.message : "API 연결 실패")
+      );
+  }, []);
 
-  const handleCreated = () => {
-    api.character
-      .list()
-      .then((characters) => {
-        setList(characters);
-        if (characters.length === 1) {
-          router.replace(`/characters/${characters[0].id}`);
-        }
-      })
-      .catch(() => {});
-  };
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streaming]);
 
-  if (loading && list.length === 0) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-12">
-        <p className="text-zinc-500 dark:text-zinc-400">로딩 중...</p>
-      </div>
+  const handleSend = useCallback((message: string) => {
+    if (isStreaming) return;
+    setIsStreaming(true);
+    setStreaming("");
+
+    const userMsg: ChatMessageDto = {
+      id: `tmp-${Date.now()}`,
+      role: "user",
+      content: message,
+      hasImage: false,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    let accumulated = "";
+    streamChatResponse(
+      message,
+      (chunk) => {
+        accumulated += chunk;
+        setStreaming(accumulated);
+      },
+      () => {
+        const assistantMsg: ChatMessageDto = {
+          id: `tmp-ai-${Date.now()}`,
+          role: "assistant",
+          content: accumulated,
+          hasImage: false,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setStreaming("");
+        setIsStreaming(false);
+        api.jlpt.getLatest().then(setJlptData).catch(() => {});
+      },
+      () => {
+        setStreaming("");
+        setIsStreaming(false);
+      },
     );
-  }
+  }, [isStreaming]);
 
-  if (error) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <p className="text-red-600 dark:text-red-400">API 오류: {error}</p>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          NestJS API가 실행 중인지 확인하세요 (기본 포트 3001).
-        </p>
-      </div>
-    );
-  }
+  const handleSendImage = useCallback((question: string, file: File) => {
+    if (isStreaming) return;
+    setIsStreaming(true);
+    setStreaming("");
 
-  if (list.length >= 1) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-12">
-        <p className="text-zinc-500 dark:text-zinc-400">캐릭터 정보로 이동 중...</p>
-      </div>
+    const userMsg: ChatMessageDto = {
+      id: `tmp-${Date.now()}`,
+      role: "user",
+      content: question || "이미지를 분석해주세요.",
+      hasImage: true,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    let accumulated = "";
+    streamImageResponse(
+      question,
+      file,
+      (chunk) => {
+        accumulated += chunk;
+        setStreaming(accumulated);
+      },
+      () => {
+        const assistantMsg: ChatMessageDto = {
+          id: `tmp-ai-${Date.now()}`,
+          role: "assistant",
+          content: accumulated,
+          hasImage: false,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setStreaming("");
+        setIsStreaming(false);
+      },
+      () => {
+        setStreaming("");
+        setIsStreaming(false);
+      },
     );
-  }
+  }, [isStreaming]);
 
   return (
-    <>
+    <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
       <AppHeader />
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <div className="py-4">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-            Life RPG Web
-          </h1>
-          <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            캐릭터를 생성하여 성장을 시작하세요.
-          </p>
-          <CharacterSetup onCreated={handleCreated} />
-        </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* 채팅 영역 */}
+        <main className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            {loadError && (
+              <div className="text-center py-8">
+                <p className="text-red-500 text-sm">{loadError}</p>
+                <p className="text-zinc-400 text-xs mt-1">
+                  NestJS API가 실행 중인지 확인하세요 (포트 3001)
+                </p>
+              </div>
+            )}
+
+            {!loadError && messages.length === 0 && !isStreaming && (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="text-4xl mb-4">🇯🇵</div>
+                <h2 className="text-xl font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+                  일본어 학습 AI
+                </h2>
+                <p className="text-zinc-400 text-sm max-w-sm">
+                  일본어 단어, 문법, 예문 등 무엇이든 질문하거나
+                  <br />
+                  이미지를 업로드해서 일본어 텍스트를 분석해보세요.
+                </p>
+              </div>
+            )}
+
+            {messages.map((msg) => (
+              <ChatBubble key={msg.id} message={msg} />
+            ))}
+
+            {isStreaming && streaming && (
+              <StreamingBubble content={streaming} />
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+
+          <ChatInput
+            onSend={handleSend}
+            onSendImage={handleSendImage}
+            disabled={isStreaming}
+          />
+        </main>
+
+        {/* JLPT 사이드바 */}
+        <JlptSidebar initial={jlptData} />
       </div>
-    </>
+    </div>
   );
 }

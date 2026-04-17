@@ -23,8 +23,8 @@ const hiMelody = Hi_Melody({
 });
 
 export const metadata: Metadata = {
-  title: "Life RPG Web",
-  description: "Life RPG - Next.js + NestJS 웹 버전",
+  title: "일본어 학습 AI",
+  description: "AI와 함께하는 일본어 학습 — 채팅, 이미지 분석, JLPT 수준 측정",
 };
 
 export default function RootLayout({
