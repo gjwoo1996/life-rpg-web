@@ -42,6 +42,10 @@ npm run dev
   DevContainer에서는 `host.docker.internal`로 Common_Repo DB 접속.
 - **OLLAMA_HOST** — Ollama API 주소  
   예: `http://host.docker.internal:11434`  
+- **LIFERPG_LLM_MODEL_DEFAULT** — 기본 LLM 모델  
+  예: `qwen3:8b`
+- **LIFERPG_LLM_MODEL_FALLBACK** — 기본 모델 실패 시 재시도할 백업 모델  
+  예: `qwen2.5:7b`
   (선택) **PORT** — API 포트 (기본 3001)
 
 ### 웹 (apps/web)
