@@ -46,6 +46,9 @@ npm run dev
   예: `qwen3:8b`
 - **LIFERPG_LLM_MODEL_FALLBACK** — 기본 모델 실패 시 재시도할 백업 모델  
   예: `qwen2.5:7b`
+- **LIFERPG_LLM_MODEL_IMAGE** — 이미지 입력 분석용 모델  
+  예: `llava:7b`
+  이미지 입력 분석은 기본적으로 `llava:7b`를 사용하며, Common_Repo에서 해당 모델이 설치되어 있어야 합니다.
   (선택) **PORT** — API 포트 (기본 3001)
 
 ### 웹 (apps/web)

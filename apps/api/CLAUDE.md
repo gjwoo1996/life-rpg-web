@@ -45,3 +45,27 @@ npx tsc -p apps/api/tsconfig.json --noEmit                          # 타입 검
 ### DB
 
 `NODE_ENV !== 'production'`에서는 TypeORM `synchronize: true` 활성화. 운영에서는 반드시 마이그레이션 사용.
+
+### 엔티티 관계
+
+```
+Character
+  ├── Goal (1:N) → GoalStep (1:N), GoalAnalysis (1:N)
+  ├── ActivityLog (1:N)
+  ├── Ability (1:N) → AbilityStat (1:N, XP upsert, max 100)
+  └── DailyAnalysis (1:N)
+```
+
+모든 엔티티는 `src/entities/`에 집중 관리. 삭제 시 `onDelete: 'CASCADE'` 설정됨.
+
+### Ollama 호출 규칙
+
+- 항상 `try/catch`로 감싼다.
+- 실패 시 상위 플로우를 중단하지 말고 조용히 무시하거나 폴백 처리한다 (활동 생성 7·8단계 패턴 참조).
+- 프롬프트는 `prompt-builder.ts`에서만 생성한다. 서비스 레이어에서 직접 문자열 조합 금지.
+
+### 테스트 작성 패턴
+
+- 파일 위치: 테스트 대상과 동일 디렉토리에 `*.spec.ts`
+- 외부 의존성(Ollama, DB)은 `jest.mock()` 또는 `@nestjs/testing` `TestingModule`로 격리
+- `describe` → `it` 구조 사용. `test()` 사용 금지

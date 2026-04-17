@@ -15,7 +15,35 @@
       "Read(//home/vscode/**)",
       "Read(//home/vscode/.config/claude/**)",
       "Bash(claude --version)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(bash:*)",
+      "Bash(npm install *)"
     ]
-  }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); [[ \"$f\" == *\"apps/api\"*\".ts\" ]] && (cd /home/vscode/life-rpg-web && npx tsc -p apps/api/tsconfig.json --noEmit 2>&1 | tail -5) || true",
+            "timeout": 30,
+            "statusMessage": "API 타입 체크 중..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Claude done' | tee /tmp/claude-done.log > /dev/null"
+          }
+        ]
+      }
+    ]
+  },
+  "autoMemoryDirectory": "/home/vscode/life-rpg-web/.claude/memory"
 }
