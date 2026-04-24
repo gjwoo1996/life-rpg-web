@@ -52,7 +52,7 @@ npm run build
 | `OLLAMA_HOST` | apps/api | Ollama API 주소 |
 | `LIFERPG_LLM_MODEL_DEFAULT` | apps/api | 기본 LLM 모델 (기본: `qwen3:8b`) |
 | `LIFERPG_LLM_MODEL_FALLBACK` | apps/api | 폴백 모델 (기본: `qwen2.5:7b`) |
-| `LIFERPG_LLM_MODEL_IMAGE` | apps/api | 이미지 입력 분석 모델 (기본: `llava:7b`) |
+| `LIFERPG_LLM_MODEL_IMAGE` | apps/api | 이미지 입력 분석 모델 (기본: `qwen2.5vl:7b`) |
 | `LIFERPG_LLM_VERBOSE` | apps/api | `true` 시 LLM 전체 응답 로그 출력 |
 | `NEXT_PUBLIC_API_URL` | apps/web | API 베이스 URL (기본: `http://localhost:3001`) |
 

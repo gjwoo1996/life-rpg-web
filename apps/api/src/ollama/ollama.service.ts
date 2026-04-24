@@ -12,7 +12,7 @@ export interface OllamaChatMessage {
 const DEFAULT_MODEL = process.env.LIFERPG_LLM_MODEL_DEFAULT || 'qwen3:8b';
 const FALLBACK_MODEL =
   process.env.LIFERPG_LLM_MODEL_FALLBACK || 'qwen2.5:7b';
-const IMAGE_MODEL = process.env.LIFERPG_LLM_MODEL_IMAGE || 'llava:7b';
+const IMAGE_MODEL = process.env.LIFERPG_LLM_MODEL_IMAGE || 'qwen2.5vl:7b';
 
 const LLM_VERBOSE = process.env.LIFERPG_LLM_VERBOSE === 'true';
 const RESPONSE_PREVIEW_LEN = 200;
@@ -436,7 +436,7 @@ export class OllamaService {
             { role: 'system', content: JAPANESE_STUDY_ASSISTANT_SYSTEM },
             {
               role: 'user',
-              content: question || '이 이미지의 일본어 텍스트를 분석해주세요.',
+              content: question || PromptBuilder.buildJapaneseReadingAnalysis(),
               images: [imageBase64],
             },
           ],

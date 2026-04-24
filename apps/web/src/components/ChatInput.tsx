@@ -95,7 +95,7 @@ export function ChatInput({
         </div>
         {selectedFile && (
           <p className="text-[11px] text-zinc-400">
-            이미지 분석은 선택값과 관계없이 `llava:7b`로 처리됩니다.
+            이미지 분석은 선택값과 관계없이 `qwen2.5vl:7b`로 처리됩니다.
           </p>
         )}
       </div>

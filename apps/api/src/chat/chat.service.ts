@@ -10,6 +10,7 @@ import {
 } from '../ollama/ollama.service';
 import { JlptService } from '../jlpt/jlpt.service';
 import { logError, logInfo, logWarn } from '../logging/structured-logger';
+import { PromptBuilder } from '../ollama/prompt-builder';
 
 interface ChatRequestLogContext {
   requestId: string;
@@ -164,7 +165,7 @@ export class ChatService {
     res: express.Response,
     context: ChatRequestLogContext,
   ): Promise<void> {
-    const userContent = question || '이 이미지의 일본어 텍스트를 분석해주세요.';
+    const userContent = question || PromptBuilder.buildJapaneseReadingAnalysis();
     const requestStartedAt = Date.now();
     let streamClosedByClient = true;
     res.on('close', () => {

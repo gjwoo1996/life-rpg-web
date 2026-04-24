@@ -13,6 +13,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
       - LIFERPG_LLM_MODEL_DEFAULT=qwen3:8b
       - LIFERPG_LLM_MODEL_FALLBACK=qwen2.5:7b
+      - LIFERPG_LLM_MODEL_IMAGE=qwen2.5vl:7b
       - TZ=Asia/Seoul
     volumes:
       - ..:${containerWorkspaceFolder}:cached
