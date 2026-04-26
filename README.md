@@ -74,4 +74,4 @@ Common_Repo 스택(PostgreSQL, Ollama)이 **먼저** 호스트에서 실행 중�
 - [docs/02-repo-structure.md](docs/02-repo-structure.md) — 리포·DB 스키마
 - [docs/03-migration-order.md](docs/03-migration-order.md) — 작업 순서
 - [docs/04-devcontainer.md](docs/04-devcontainer.md) — DevContainer 상세
-test
+test11
